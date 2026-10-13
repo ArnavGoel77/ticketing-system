@@ -13,16 +13,6 @@ The system is engineered using a normalized **Entity-Relationship (ER) model** r
 
 ---
 
-## 👥 Contributors & Division of Labor
-
-To ensure balanced technical contributions across the database schema, business logic, and full-stack integration, the operational entities and features are divided into two dedicated modules:
-
-| Contributor | Module | Assigned Entities | Primary Responsibilities |
-| :--- | :--- | :--- | :--- |
-| **Arnav Goel** | **Ticket Management** | `TICKETS`<br>`TICKET_RESOLUTIONS` | Incident lifecycle, priority queues, status transitions, resolution tracking, assignment triggers, and concurrency control. |
-| **Shobit Gupta** | **Identity & Organization** | `EMPLOYEES`<br>`DEPARTMENTS` | Organizational hierarchy, role-based personnel modeling (`USER`, `TECHNICIAN`, `ADMIN`), departmental locations, and staffing metrics. |
-
----
 
 ## 🏗️ System Architecture
 
@@ -38,8 +28,8 @@ flowchart TD
     subgraph Backend ["Backend API (Server)"]
         Express["Express.js Server (Port 5000)"]
         Driver["node-oracledb (Thin / Thick Mode)"]
-        Routes1["/api/tickets (Arnav's Module)"]
-        Routes2["/api/organization (Shobit's Module)"]
+        Routes1["/api/tickets (Incident Management)"]
+        Routes2["/api/organization (Org & Identity)"]
         Routes3["/api/analytics (Aggregate Metrics)"]
     end
 
@@ -107,19 +97,19 @@ erDiagram
 
 ### Table Specifications
 
-#### 1. `DEPARTMENTS` (Shobit's Module)
+#### 1. `DEPARTMENTS`
 * `department_id` (`NUMBER`, PK): Unique department identifier.
 * `department_name` (`VARCHAR2(100)`, NOT NULL): Organizational department name (e.g., *Information Technology*, *Software Engineering*).
 * `location_building` (`VARCHAR2(100)`, NOT NULL): Physical campus building/floor location.
 
-#### 2. `EMPLOYEES` (Shobit's Module)
+#### 2. `EMPLOYEES`
 * `employee_id` (`NUMBER`, PK): Unique employee identification number.
 * `department_id` (`NUMBER`, FK $\rightarrow$ `DEPARTMENTS.department_id`): Associated department with `ON DELETE CASCADE`.
 * `full_name` (`VARCHAR2(100)`, NOT NULL): Employee's full name.
 * `email` (`VARCHAR2(150)`, UNIQUE, NOT NULL): Corporate email address.
 * `role` (`VARCHAR2(20)`, CHECK): Constrained to `('USER', 'TECHNICIAN', 'ADMIN')`.
 
-#### 3. `TICKETS` (Arnav's Module)
+#### 3. `TICKETS`
 * `ticket_id` (`NUMBER`, PK): Unique incident tracking identifier.
 * `user_id` (`NUMBER`, FK $\rightarrow$ `EMPLOYEES.employee_id`): The employee who reported the incident.
 * `issue_category` (`VARCHAR2(100)`, NOT NULL): Incident category (e.g., *Hardware Failure*, *Network & VPN*, *Access Permissions*).
@@ -127,7 +117,7 @@ erDiagram
 * `status` (`VARCHAR2(20)`, DEFAULT `'OPEN'`, CHECK): Incident lifecycle status: `('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED')`.
 * `created_at` (`TIMESTAMP`, DEFAULT `CURRENT_TIMESTAMP`): Submission timestamp.
 
-#### 4. `TICKET_RESOLUTIONS` (Arnav's Module)
+#### 4. `TICKET_RESOLUTIONS`
 * `resolution_id` (`NUMBER`, PK): Unique resolution record key.
 * `ticket_id` (`NUMBER`, FK $\rightarrow$ `TICKETS.ticket_id`, UNIQUE): 1-to-1 relationship with `TICKETS` (`ON DELETE CASCADE`).
 * `technician_id` (`NUMBER`, FK $\rightarrow$ `EMPLOYEES.employee_id`): The assigned technician resolving the issue.
