@@ -1,6 +1,6 @@
 # IT Service Desk Ticketing System
 
-> **DBMS Lab Project** &bull; Vellore Institute of Technology (VIT)  
+> **Database Systems Project** &bull; Vellore Institute of Technology (VIT)  
 > Relational Database Management System built on **Oracle SQL**, **Node.js (Express)**, and **React**.
 
 ---
@@ -17,37 +17,32 @@ The system is engineered using a normalized **Entity-Relationship (ER) model** r
 ## 🏗️ System Architecture
 
 ```mermaid
-flowchart TD
-    subgraph Frontend ["Frontend (Client)"]
-        UI["React Single-Page Dashboard"]
-        Forms["Ticket Submission Form (INSERT)"]
-        Grid["Active Incidents Data Grid (SELECT)"]
-        Charts["Analytical KPI Metrics (GROUP BY / HAVING)"]
+flowchart LR
+    subgraph ClientTier ["Presentation Tier (Frontend)"]
+        direction TB
+        UI["React Web Application<br/><i>(Vite + Tailwind CSS)</i>"]
+        Features["&bull; Ticket Submission Form<br/>&bull; Active Incident Data Grid<br/>&bull; Analytical KPI Metrics"]
+        UI --- Features
     end
 
-    subgraph Backend ["Backend API (Server)"]
-        Express["Express.js Server (Port 5000)"]
-        Driver["node-oracledb (Thin / Thick Mode)"]
-        Routes1["/api/tickets (Incident Management)"]
-        Routes2["/api/organization (Org & Identity)"]
-        Routes3["/api/analytics (Aggregate Metrics)"]
+    subgraph APITier ["Application Tier (Backend)"]
+        direction TB
+        API["Node.js & Express REST API<br/><i>(Port 5000)</i>"]
+        Endpoints["&bull; /api/tickets<br/>&bull; /api/organization<br/>&bull; /api/analytics"]
+        Driver["node-oracledb Pool Driver"]
+        API --- Endpoints
+        Endpoints --- Driver
     end
 
-    subgraph Database ["Persistence Layer (Oracle Database)"]
-        Oracle["Oracle Autonomous DB / 26ai"]
-        T1["DEPARTMENTS"]
-        T2["EMPLOYEES"]
-        T3["TICKETS"]
-        T4["TICKET_RESOLUTIONS"]
+    subgraph DBTier ["Persistence Tier (Database)"]
+        direction TB
+        Oracle["Oracle Autonomous DB 26ai"]
+        Schema["&bull; DEPARTMENTS<br/>&bull; EMPLOYEES<br/>&bull; TICKETS<br/>&bull; TICKET_RESOLUTIONS"]
+        Oracle --- Schema
     end
 
-    UI --> Express
-    Forms --> Routes1
-    Grid --> Routes1
-    Charts --> Routes3
-    Express --> Driver
-    Driver --> Oracle
-    Oracle --> T1 & T2 & T3 & T4
+    ClientTier -->|HTTP / JSON Requests| APITier
+    APITier -->|SQL Queries & Transactions| DBTier
 ```
 
 ---
@@ -58,40 +53,38 @@ The database design strictly enforces referential integrity, domain constraints,
 
 ```mermaid
 erDiagram
-    DEPARTMENTS ||--o{ EMPLOYEES : "employs"
-    EMPLOYEES ||--o{ TICKETS : "raises"
-    EMPLOYEES ||--o{ TICKET_RESOLUTIONS : "resolves"
+    DEPARTMENTS ||--|{ EMPLOYEES : "has"
+    EMPLOYEES ||--o{ TICKETS : "submits"
     TICKETS ||--o| TICKET_RESOLUTIONS : "resolved_by"
+    EMPLOYEES ||--o{ TICKET_RESOLUTIONS : "resolves"
 
     DEPARTMENTS {
-        NUMBER department_id PK
-        VARCHAR2 department_name
-        VARCHAR2 location_building
+        number department_id PK
+        string department_name
+        string location_building
     }
 
     EMPLOYEES {
-        NUMBER employee_id PK
-        NUMBER department_id FK
-        VARCHAR2 full_name
-        VARCHAR2 email UK
-        VARCHAR2 role
+        number employee_id PK
+        number department_id FK
+        string full_name
+        string email UK
+        string role
     }
 
     TICKETS {
-        NUMBER ticket_id PK
-        NUMBER user_id FK
-        VARCHAR2 issue_category
-        VARCHAR2 priority_level
-        VARCHAR2 status
-        TIMESTAMP created_at
+        number ticket_id PK
+        number user_id FK
+        string issue_category
+        string priority_level
+        string status
     }
 
     TICKET_RESOLUTIONS {
-        NUMBER resolution_id PK
-        NUMBER ticket_id FK, UK
-        NUMBER technician_id FK
-        VARCHAR2 resolution_notes
-        TIMESTAMP resolved_at
+        number resolution_id PK
+        number ticket_id FK
+        number technician_id FK
+        string resolution_notes
     }
 ```
 
@@ -249,4 +242,4 @@ Open `http://localhost:3000` (or the Vite dev URL provided in the console) to ac
 
 ## 📄 License & Academic Integrity
 
-This project is developed solely for educational and evaluation purposes as part of the **DBMS Laboratory (CSE2004)** curriculum at **Vellore Institute of Technology**. All rights reserved.
+This project is developed solely for educational and evaluation purposes for the **Database Systems** course at **Vellore Institute of Technology**. All rights reserved.
