@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+/.pnpm-store
+
+# Environment variables & secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Oracle Cloud Wallet & Database Credentials
+*.zip
+**/wallet/
+wallet/
+*.sso
+*.ora
+*.p12
+*.jks
+*.pem
+
+# Production build outputs
+dist/
+build/
+out/
+.next/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# IDE & Editor files
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vscode/*
+!.vscode/extensions.json
