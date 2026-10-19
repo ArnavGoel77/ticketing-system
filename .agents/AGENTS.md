@@ -134,14 +134,23 @@ Error responses use `"success": false` with an appropriate HTTP status code (`40
 
 ---
 
-## SQL File Responsibilities
+## SQL File Responsibilities (Zero-Conflict File Separation)
 
+### Shobit's Dedicated Files (Identity & Organization Module)
 | File | What Goes Inside | Owner |
 | :--- | :--- | :--- |
-| `sql/01_schema.sql` | All 4 `CREATE TABLE` statements in dependency order | Both (Shobit writes tables 1-2, Arnav writes tables 3-4) |
-| `sql/02_seed_data.sql` | `INSERT`, `UPDATE`, `DELETE` statements with mock data | Both (Shobit seeds depts/emps, Arnav seeds tickets/resolutions) |
-| `sql/03_review1_queries.sql` | Analytical queries: Single-row functions (`UPPER`, `TO_CHAR`, `NVL`) and aggregate functions (`COUNT`, `GROUP BY`, `HAVING`) | Both |
-| `sql/scratch_ddl_demo.sql` | `ALTER TABLE` (add `updated_at` column) + `DROP TABLE` demo | Arnav |
+| `sql/shobit_01_schema.sql` | `CREATE TABLE DEPARTMENTS` and `CREATE TABLE EMPLOYEES` | Shobit |
+| `sql/shobit_02_seed_data.sql` | `INSERT` departments (1–5) and employees (101–302), sample update & delete | Shobit |
+| `sql/shobit_03_queries.sql` | Analytical queries: `UPPER()`, `LOWER()`, `LENGTH()`, `INITCAP()`, department headcount `COUNT()` + `HAVING` | Shobit |
+
+### Arnav's Dedicated Files (Ticket Management Module)
+| File | What Goes Inside | Owner |
+| :--- | :--- | :--- |
+| `sql/01_schema.sql` | `CREATE TABLE TICKETS` and `CREATE TABLE TICKET_RESOLUTIONS` | Arnav |
+| `sql/02_seed_data.sql` | `INSERT` tickets (1001–1008) and resolutions (5001–5004), status updates & delete | Arnav |
+| `sql/03_review1_queries.sql` | Analytical queries: `TO_CHAR()`, `UPPER()`, `NVL()`, `ROUND()`, priority queue `COUNT()` + `HAVING >= 2`, status distribution, average resolution time | Arnav |
+| `sql/scratch_ddl_demo.sql` | `ALTER TABLE` (add/modify/drop `updated_at` column) + safe `DROP TABLE` demo | Arnav |
+
 
 ---
 
