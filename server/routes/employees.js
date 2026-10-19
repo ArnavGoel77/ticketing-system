@@ -185,4 +185,38 @@ router.post('/', async (req, res) => {
     }
 });
 
+// ============================================================================
+// 5. DELETE /api/employees/:id (Delete Employee with FK Constraint Handling)
+// ============================================================================
+router.delete('/:id', async (req, res) => {
+    const { id } = req.params;
+    const employeeId = Number(id);
+
+    try {
+        const sql = `DELETE FROM EMPLOYEES WHERE employee_id = :id`;
+        const result = await executeQuery(sql, { id: employeeId });
+
+        if (result.rowsAffected === 0) {
+            return sendResponse(res, 404, false, null, `Employee #${id} not found.`);
+        }
+
+        return sendResponse(res, 200, true, { employee_id: employeeId }, 'Employee deleted successfully');
+    } catch (err) {
+        console.error(`Error deleting employee #${id}:`, err);
+
+        // Check for ORA-02292: child record found (e.g. Technician referenced in TICKET_RESOLUTIONS)
+        if (err.message.includes('ORA-02292')) {
+            return sendResponse(
+                res,
+                409,
+                false,
+                null,
+                'Cannot delete technician with existing ticket resolutions. Reassign or remove resolutions first.'
+            );
+        }
+
+        return sendResponse(res, 500, false, null, `Deletion failed: ${err.message}`);
+    }
+});
+
 module.exports = router;

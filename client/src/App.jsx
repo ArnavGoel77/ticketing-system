@@ -268,6 +268,32 @@ export default function App() {
     }
   };
 
+  // Delete Employee (Shobit's Module)
+  const handleDeleteEmployee = async (empId, empName) => {
+    if (!window.confirm(`Are you sure you want to remove employee "${empName}"?`)) return;
+    try {
+      const res = await fetch(`/api/employees/${empId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete employee');
+      }
+
+      showToast(data.message || `Employee "${empName}" removed successfully.`, 'success');
+      fetchData();
+    } catch (err) {
+      showToast(err.message, 'danger');
+    }
+  };
+
+  // RBAC Admin permission check (compatible with Arnav's profile/role switcher)
+  const isSuperAdmin = typeof activeRole !== 'undefined'
+    ? activeRole === 'ADMIN'
+    : typeof activeProfile !== 'undefined'
+    ? activeProfile?.role === 'ADMIN'
+    : typeof currentProfile !== 'undefined'
+    ? currentProfile?.role === 'ADMIN'
+    : true;
+
   // Helper for Initials
   const getInitials = (name) => {
     if (!name) return 'U';
@@ -1205,6 +1231,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
                         <th style={{ padding: '10px 12px', fontWeight: 600 }}>Department</th>
                         <th style={{ padding: '10px 12px', fontWeight: 600 }}>Building Location</th>
                         <th style={{ padding: '10px 12px', fontWeight: 600 }}>Role</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1280,6 +1307,20 @@ HAVING COUNT(e.employee_id) >= 2;`}
                               >
                                 {role}
                               </span>
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                              <button
+                                onClick={() => handleDeleteEmployee(empId, name)}
+                                disabled={!isSuperAdmin}
+                                className="btn btn-danger btn-xs"
+                                style={{
+                                  opacity: isSuperAdmin ? 1 : 0.4,
+                                  cursor: isSuperAdmin ? 'pointer' : 'not-allowed',
+                                }}
+                                title={isSuperAdmin ? `Remove ${name}` : 'Admin privileges required to remove staff'}
+                              >
+                                Delete
+                              </button>
                             </td>
                           </tr>
                         );
@@ -1528,12 +1569,41 @@ HAVING COUNT(e.employee_id) >= 2;`}
                     value={empFormData.department_id}
                     onChange={(e) => setEmpFormData({ ...empFormData, department_id: Number(e.target.value) })}
                   >
-                    {departments.map((d) => (
-                      <option key={d.DEPARTMENT_ID} value={d.DEPARTMENT_ID}>
-                        #{d.DEPARTMENT_ID} - {d.DEPARTMENT_NAME}
-                      </option>
-                    ))}
+                    {departments.map((d) => {
+                      const loc = d.STANDARDIZED_LOCATION || d.LOCATION_BUILDING || '';
+                      return (
+                        <option key={d.DEPARTMENT_ID} value={d.DEPARTMENT_ID}>
+                          #{d.DEPARTMENT_ID} - {d.DEPARTMENT_NAME} {loc ? `(${loc})` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
+                  <div
+                    style={{
+                      marginTop: '8px',
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '11.5px',
+                      color: '#475569',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    <span style={{ fontSize: '13px' }}>📍</span>
+                    <span>
+                      Building Location:{' '}
+                      <strong style={{ color: '#0f172a' }}>
+                        {departments.find((d) => Number(d.DEPARTMENT_ID) === Number(empFormData.department_id))?.STANDARDIZED_LOCATION ||
+                          departments.find((d) => Number(d.DEPARTMENT_ID) === Number(empFormData.department_id))?.LOCATION_BUILDING ||
+                          'Assigned Campus'}
+                      </strong>{' '}
+                      <span style={{ color: '#64748b' }}>(Pre-defined)</span>
+                    </span>
+                  </div>
                 </div>
               </div>
 
