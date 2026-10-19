@@ -102,8 +102,8 @@ export default function App() {
 
   // New Ticket Form State
   const [formData, setFormData] = useState({
-    user_id: 101,
-    issue_category: 'NETWORK',
+    user_id: '',
+    issue_category: '',
     priority_level: 'MEDIUM',
   });
   const [submitting, setSubmitting] = useState(false);
@@ -111,7 +111,7 @@ export default function App() {
   // Resolve Modal State
   const [resolvingTicket, setResolvingTicket] = useState(null);
   const [resolveData, setResolveData] = useState({
-    technician_id: 201,
+    technician_id: '',
     resolution_notes: '',
   });
   const [resolving, setResolving] = useState(false);
@@ -120,10 +120,19 @@ export default function App() {
   const [empFormData, setEmpFormData] = useState({
     full_name: '',
     email: '',
-    role: 'USER',
-    department_id: 1,
+    role: '',
+    department_id: '',
   });
   const [registeringEmp, setRegisteringEmp] = useState(false);
+
+  // On-screen Confirmation Popup State (Replaces browser window.confirm alerts)
+  const [confirmDelete, setConfirmDelete] = useState({
+    isOpen: false,
+    type: null,
+    id: null,
+    name: '',
+    details: '',
+  });
 
   // Show Toast Notification
   const showToast = (message, type = 'success') => {
@@ -157,10 +166,6 @@ export default function App() {
       if (deptJson.success) setDepartments(deptJson.data || []);
       if (empJson.success) {
         setEmployees(empJson.data || []);
-        const usersList = (empJson.data || []).filter(e => e.ROLE === 'USER');
-        if (usersList.length > 0 && !formData.user_id) {
-          setFormData(prev => ({ ...prev, user_id: usersList[0].EMPLOYEE_ID }));
-        }
       }
       if (headJson.success) setHeadcountMetrics(headJson.data || []);
     } catch (err) {
@@ -189,6 +194,14 @@ export default function App() {
   // Submit New Ticket (Arnav's Module)
   const handleSubmitTicket = async (e) => {
     e.preventDefault();
+    if (!formData.user_id) {
+      showToast('Please select a requester identity.', 'danger');
+      return;
+    }
+    if (!formData.issue_category) {
+      showToast('Please select an issue category.', 'danger');
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch('/api/tickets', {
@@ -203,8 +216,8 @@ export default function App() {
 
       showToast(`Ticket #${data.data.ticket_id} created successfully!`, 'success');
       setFormData({
-        user_id: availableUsers[0]?.id || 101,
-        issue_category: 'NETWORK',
+        user_id: '',
+        issue_category: '',
         priority_level: 'MEDIUM',
       });
       setIsCreateModalOpen(false);
@@ -234,13 +247,20 @@ export default function App() {
     }
   };
 
-  // Delete Ticket (Arnav's Module)
-  const handleDeleteTicket = async (ticketId) => {
-    if (!window.confirm(`Are you sure you want to delete Ticket #${ticketId}?`)) return;
+  // Execute Ticket Deletion (Confirmed via on-screen modal)
+  const executeDeleteTicket = async (ticketId) => {
     try {
       const res = await fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message);
+      let data;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete ticket');
 
       showToast(`Ticket #${ticketId} deleted.`, 'success');
       fetchData();
@@ -252,8 +272,12 @@ export default function App() {
   // Submit Resolution (Arnav's Module)
   const handleResolveTicket = async (e) => {
     e.preventDefault();
+    if (!resolveData.technician_id) {
+      showToast('Please select a resolving engineer.', 'danger');
+      return;
+    }
     if (!resolveData.resolution_notes.trim()) {
-      alert('Please enter technical resolution notes.');
+      showToast('Please enter technical resolution notes.', 'danger');
       return;
     }
     setResolving(true);
@@ -269,7 +293,7 @@ export default function App() {
 
       showToast(`Ticket #${ticketId} resolved successfully.`, 'success');
       setResolvingTicket(null);
-      setResolveData({ technician_id: availableTechnicians[0]?.id || 201, resolution_notes: '' });
+      setResolveData({ technician_id: '', resolution_notes: '' });
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
@@ -282,7 +306,15 @@ export default function App() {
   const handleRegisterEmployee = async (e) => {
     e.preventDefault();
     if (!empFormData.full_name.trim() || !empFormData.email.trim()) {
-      alert('Full name and email are required.');
+      showToast('Full name and email are required.', 'danger');
+      return;
+    }
+    if (!empFormData.role) {
+      showToast('Please select an employee role.', 'danger');
+      return;
+    }
+    if (!empFormData.department_id) {
+      showToast('Please select a department.', 'danger');
       return;
     }
     setRegisteringEmp(true);
@@ -300,8 +332,8 @@ export default function App() {
       setEmpFormData({
         full_name: '',
         email: '',
-        role: 'USER',
-        department_id: departments[0]?.DEPARTMENT_ID || 1,
+        role: '',
+        department_id: '',
       });
       fetchData();
     } catch (err) {
@@ -311,12 +343,19 @@ export default function App() {
     }
   };
 
-  // Delete Employee (Shobit's Module)
-  const handleDeleteEmployee = async (empId, empName) => {
-    if (!window.confirm(`Are you sure you want to remove employee "${empName}"?`)) return;
+  // Execute Employee Deletion (Confirmed via on-screen modal)
+  const executeDeleteEmployee = async (empId, empName) => {
     try {
       const res = await fetch(`/api/employees/${empId}`, { method: 'DELETE' });
-      const data = await res.json();
+      let data;
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server responded with HTTP ${res.status}`);
+      }
+
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to delete employee');
       }
@@ -993,86 +1032,6 @@ HAVING COUNT(*) >= 2;`}
 
               {/* Main Tickets Data Table */}
               <section className="card" style={{ padding: '20px', overflow: 'hidden' }}>
-                {/* Engineer Mode Active Queue Callout */}
-                {currentProfile.role === 'TECHNICIAN' && (
-                  <div
-                    style={{
-                      marginBottom: '16px',
-                      padding: '12px 16px',
-                      borderRadius: '8px',
-                      background: '#fffbeb',
-                      border: '1px solid #fef3c7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '18px' }}>🛠️</span>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#92400e' }}>
-                          Support Engineer Workbench
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#b45309' }}>
-                          {tickets.filter(t => (t.STATUS || t.status) === 'OPEN').length} tickets waiting for triage &bull; {tickets.filter(t => (t.STATUS || t.status) === 'IN_PROGRESS').length} actively in progress.
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => setStatusFilter('OPEN')}
-                        className="btn btn-secondary btn-xs"
-                        style={{ borderColor: '#fde68a', background: '#ffffff', color: '#92400e' }}
-                      >
-                        Triage Queue
-                      </button>
-                      <button
-                        onClick={() => setStatusFilter('IN_PROGRESS')}
-                        className="btn btn-secondary btn-xs"
-                        style={{ borderColor: '#fde68a', background: '#ffffff', color: '#92400e' }}
-                      >
-                        In Progress
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* User Mode Greeting Banner */}
-                {currentProfile.role === 'USER' && (
-                  <div
-                    style={{
-                      marginBottom: '16px',
-                      padding: '12px 16px',
-                      borderRadius: '8px',
-                      background: '#eff6ff',
-                      border: '1px solid #dbeafe',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: '12px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '18px' }}>👤</span>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e40af' }}>
-                          End User Support Portal
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#2563eb' }}>
-                          Submit IT support tickets and track resolution status in real time.
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setIsCreateModalOpen(true)}
-                      className="btn btn-primary btn-xs"
-                    >
-                      + New Ticket
-                    </button>
-                  </div>
-                )}
-
                 {/* Search & Priority Filter Toolbar */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
                   <div style={{ position: 'relative', width: '320px' }}>
@@ -1242,9 +1201,7 @@ HAVING COUNT(*) >= 2;`}
                                     <button
                                       onClick={() => {
                                         setResolvingTicket(t);
-                                        if (currentProfile.role === 'TECHNICIAN') {
-                                          setResolveData(prev => ({ ...prev, technician_id: currentProfile.id }));
-                                        }
+                                        setResolveData({ technician_id: '', resolution_notes: '' });
                                       }}
                                       className="btn btn-success btn-xs"
                                       title="Record Technical Resolution"
@@ -1255,7 +1212,13 @@ HAVING COUNT(*) >= 2;`}
                                   {/* Delete: Only for Admin */}
                                   {currentProfile.role === 'ADMIN' && (
                                     <button
-                                      onClick={() => handleDeleteTicket(ticketId)}
+                                      onClick={() => setConfirmDelete({
+                                        isOpen: true,
+                                        type: 'ticket',
+                                        id: ticketId,
+                                        name: `Incident #${ticketId}`,
+                                        details: `Are you sure you want to permanently delete Incident #${ticketId}? This operation will remove the ticket and any linked resolutions from Oracle.`,
+                                      })}
                                       className="btn btn-danger btn-xs"
                                       title="Delete ticket (Admin only)"
                                     >
@@ -1660,7 +1623,13 @@ HAVING COUNT(e.employee_id) >= 2;`}
                             </td>
                             <td style={{ padding: '12px', textAlign: 'right' }}>
                               <button
-                                onClick={() => handleDeleteEmployee(empId, name)}
+                                onClick={() => setConfirmDelete({
+                                  isOpen: true,
+                                  type: 'employee',
+                                  id: empId,
+                                  name: name,
+                                  details: `Are you sure you want to remove employee "${name}" (${badge})? This operation will delete the employee record from the EMPLOYEES table.`,
+                                })}
                                 disabled={!isSuperAdmin}
                                 className="btn btn-danger btn-xs"
                                 style={{
@@ -1709,9 +1678,10 @@ HAVING COUNT(e.employee_id) >= 2;`}
                 </label>
                 <select
                   value={formData.user_id}
-                  onChange={(e) => setFormData({ ...formData, user_id: Number(e.target.value) })}
+                  onChange={(e) => setFormData({ ...formData, user_id: e.target.value ? Number(e.target.value) : '' })}
                   required
                 >
+                  <option value="">-- Select Requester --</option>
                   {availableUsers.map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name} ({u.dept}) — ID #{u.id}
@@ -1732,6 +1702,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
                   onChange={(e) => setFormData({ ...formData, issue_category: e.target.value })}
                   required
                 >
+                  <option value="">-- Select Category --</option>
                   {CATEGORIES.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.label}
@@ -1808,9 +1779,10 @@ HAVING COUNT(e.employee_id) >= 2;`}
                 </label>
                 <select
                   value={resolveData.technician_id}
-                  onChange={(e) => setResolveData({ ...resolveData, technician_id: Number(e.target.value) })}
+                  onChange={(e) => setResolveData({ ...resolveData, technician_id: e.target.value ? Number(e.target.value) : '' })}
                   required
                 >
+                  <option value="">-- Select Resolving Engineer --</option>
                   {availableTechnicians.map((tech) => (
                     <option key={tech.id} value={tech.id}>
                       {tech.name} ({tech.dept}) — ID #{tech.id}
@@ -1910,7 +1882,9 @@ HAVING COUNT(e.employee_id) >= 2;`}
                   <select
                     value={empFormData.role}
                     onChange={(e) => setEmpFormData({ ...empFormData, role: e.target.value })}
+                    required
                   >
+                    <option value="">-- Select Role --</option>
                     <option value="USER">USER (Requester)</option>
                     <option value="TECHNICIAN">TECHNICIAN (Resolver)</option>
                     <option value="ADMIN">ADMIN (Manager)</option>
@@ -1923,8 +1897,10 @@ HAVING COUNT(e.employee_id) >= 2;`}
                   </label>
                   <select
                     value={empFormData.department_id}
-                    onChange={(e) => setEmpFormData({ ...empFormData, department_id: Number(e.target.value) })}
+                    onChange={(e) => setEmpFormData({ ...empFormData, department_id: e.target.value ? Number(e.target.value) : '' })}
+                    required
                   >
+                    <option value="">-- Select Department --</option>
                     {departments.map((d) => {
                       const loc = d.STANDARDIZED_LOCATION || d.LOCATION_BUILDING || '';
                       return (
@@ -1976,6 +1952,87 @@ HAVING COUNT(e.employee_id) >= 2;`}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 4: ON-SCREEN DELETE CONFIRMATION POPUP                          */}
+      {/* ===================================================================== */}
+      {confirmDelete.isOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setConfirmDelete({ isOpen: false, type: null, id: null, name: '', details: '' })}
+          style={{ zIndex: 1100 }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '430px',
+              padding: '24px',
+              background: '#ffffff',
+              boxShadow: 'var(--shadow-lg)',
+              borderRadius: '12px',
+              border: '1px solid #fee2e2',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: '#fef2f2',
+                  color: '#dc2626',
+                  fontSize: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  border: '1px solid #fee2e2',
+                }}
+              >
+                ⚠️
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  Confirm Deletion
+                </h3>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  Permanent database operation
+                </span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', color: '#334155', lineHeight: 1.5, marginBottom: '22px' }}>
+              {confirmDelete.details}
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete({ isOpen: false, type: null, id: null, name: '', details: '' })}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmDelete.type === 'ticket') {
+                    executeDeleteTicket(confirmDelete.id);
+                  } else if (confirmDelete.type === 'employee') {
+                    executeDeleteEmployee(confirmDelete.id, confirmDelete.name);
+                  }
+                  setConfirmDelete({ isOpen: false, type: null, id: null, name: '', details: '' });
+                }}
+                className="btn btn-danger"
+                style={{ background: '#dc2626', borderColor: '#dc2626', color: '#ffffff', fontWeight: 600 }}
+              >
+                Delete Permanently
+              </button>
+            </div>
           </div>
         </div>
       )}
