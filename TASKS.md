@@ -117,9 +117,9 @@ Review 1 evaluates foundational relational modeling, standard SQL (DDL, DML, sin
 - [x] **Insert 5 Departments (`IDs: 1–5`):**
   - IT Support (Tech Park A), Engineering (Innovation Block), HR (Admin Wing), Finance (Admin Wing), Operations (Tech Park B).
 - [x] **Insert 11 Employees (`IDs: 101–302`):**
-  - Users: `101: Alice Smith`, `102: Bob Jones`, `103: Charlie Brown`, `104: Diana Prince`, `105: Evan Wright`, `106: Fiona Gallagher` (`role = 'USER'`).
-  - Technicians: `201: Kevin Mitnick`, `202: Ada Lovelace`, `203: Linus Torvalds` (`role = 'TECHNICIAN'`).
-  - Admins: `301: Grace Hopper`, `302: Alan Turing` (`role = 'ADMIN'`).
+  - Users: `101: Aarav Sharma`, `102: Priya Patel`, `103: Rohan Iyer`, `104: Ananya Verma`, `105: Aditya Nair`, `106: Sneha Kulkarni` (`role = 'USER'`).
+  - Technicians: `201: Vikram Malhotra`, `202: Neha Sengupta`, `203: Rahul Deshmukh` (`role = 'TECHNICIAN'`).
+  - Admins: `301: Suresh Menon`, `302: Deepika Rao` (`role = 'ADMIN'`).
 - [x] **Sample Employee Update:** Change employee department (`UPDATE EMPLOYEES SET department_id = 1 WHERE employee_id = 105;`).
 - [x] **Sample Employee Deletion:** Safe delete test with temporary employee.
 

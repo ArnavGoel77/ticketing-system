@@ -37,46 +37,46 @@ VALUES (5, 'Operations', 'Tech Park B');
 
 -- 2.1 Standard Users (Submitters: IDs 101 - 106)
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (101, 2, 'Alice Smith', 'alice.smith@company.com', 'USER');
+VALUES (101, 2, 'Aarav Sharma', 'aarav.sharma@company.com', 'USER');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (102, 2, 'Bob Jones', 'bob.jones@company.com', 'USER');
+VALUES (102, 2, 'Priya Patel', 'priya.patel@company.com', 'USER');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (103, 3, 'Charlie Brown', 'charlie.brown@company.com', 'USER');
+VALUES (103, 3, 'Rohan Iyer', 'rohan.iyer@company.com', 'USER');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (104, 4, 'Diana Prince', 'diana.prince@company.com', 'USER');
+VALUES (104, 4, 'Ananya Verma', 'ananya.verma@company.com', 'USER');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (105, 5, 'Evan Wright', 'evan.wright@company.com', 'USER');
+VALUES (105, 5, 'Aditya Nair', 'aditya.nair@company.com', 'USER');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (106, 5, 'Fiona Gallagher', 'fiona.gallagher@company.com', 'USER');
+VALUES (106, 5, 'Sneha Kulkarni', 'sneha.kulkarni@company.com', 'USER');
 
 -- 2.2 IT Support Technicians (Resolvers: IDs 201 - 203)
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (201, 1, 'Kevin Mitnick', 'kevin.mitnick@company.com', 'TECHNICIAN');
+VALUES (201, 1, 'Vikram Malhotra', 'vikram.malhotra@company.com', 'TECHNICIAN');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (202, 1, 'Ada Lovelace', 'ada.lovelace@company.com', 'TECHNICIAN');
+VALUES (202, 1, 'Neha Sengupta', 'neha.sengupta@company.com', 'TECHNICIAN');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (203, 1, 'Linus Torvalds', 'linus.torvalds@company.com', 'TECHNICIAN');
+VALUES (203, 1, 'Rahul Deshmukh', 'rahul.deshmukh@company.com', 'TECHNICIAN');
 
 -- 2.3 System Administrators (Managers: IDs 301 - 302)
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (301, 1, 'Grace Hopper', 'grace.hopper@company.com', 'ADMIN');
+VALUES (301, 1, 'Suresh Menon', 'suresh.menon@company.com', 'ADMIN');
 
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (302, 2, 'Alan Turing', 'alan.turing@company.com', 'ADMIN');
+VALUES (302, 2, 'Deepika Rao', 'deepika.rao@company.com', 'ADMIN');
 
 
 -- ============================================================================
 -- 3. STANDARD DML UPDATE OPERATIONS
 -- ============================================================================
 
--- 3.1 Department Reassignment: Transfer Evan Wright (105) to IT Support (1)
+-- 3.1 Department Reassignment: Transfer Aditya Nair (105) to IT Support (1)
 UPDATE EMPLOYEES 
 SET department_id = 1 
 WHERE employee_id = 105;
@@ -93,7 +93,7 @@ WHERE department_id = 5;
 
 -- 4.1 Temporary Employee Lifecycle (Insert & Direct Delete)
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (999, 1, 'Temporary Contractor', 'temp.contractor@company.com', 'USER');
+VALUES (999, 1, 'Rakesh Gupta', 'rakesh.gupta@company.com', 'USER');
 
 DELETE FROM EMPLOYEES 
 WHERE employee_id = 999;
@@ -105,7 +105,7 @@ VALUES (99, 'Quality Assurance Temp', 'Annex C');
 
 -- Step B: Assign temporary tester to the temporary department
 INSERT INTO EMPLOYEES (employee_id, department_id, full_name, email, role) 
-VALUES (998, 99, 'Tester Tim', 'tim.test@company.com', 'USER');
+VALUES (998, 99, 'Kiran Joshi', 'kiran.joshi@company.com', 'USER');
 
 -- Step C: Delete the department (FK on EMPLOYEES sets department_id to NULL rather than rejecting or deleting employee)
 DELETE FROM DEPARTMENTS 
