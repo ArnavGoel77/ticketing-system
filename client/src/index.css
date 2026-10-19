@@ -1,24 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --bg-app: #0d1117;
-  --bg-surface: #161b22;
-  --bg-surface-elevated: #1c2129;
-  --bg-subtle: #0f141c;
-  
-  --border-subtle: #21262d;
-  --border-medium: #30363d;
-  --border-focus: #3b82f6;
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-hover: #f8fafc;
 
-  --text-primary: #f0f6fc;
-  --text-secondary: #8b949e;
-  --text-tertiary: #6e7681;
+  --border-subtle: #e2e8f0;
+  --border-medium: #cbd5e1;
+  --border-focus: #2563eb;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
 
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
+  --primary-light: #eff6ff;
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
 * {
@@ -47,6 +53,7 @@ body {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
+  box-shadow: var(--shadow-sm);
 }
 
 /* Custom Scrollbar */
@@ -65,59 +72,60 @@ body {
   background: var(--text-tertiary);
 }
 
-/* Badges - Refined Enterprise Style (No Neon) */
+/* Badges - Refined Clean Corporate Style */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  line-height: 1;
 }
 
 .badge-low {
-  background: #181d28;
-  color: #8b949e;
-  border: 1px solid #30363d;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
 }
 .badge-medium {
-  background: #111f38;
-  color: #58a6ff;
-  border: 1px solid #1f355c;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #dbeafe;
 }
 .badge-high {
-  background: #2b1f11;
-  color: #d29922;
-  border: 1px solid #4a341b;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fef3c7;
 }
 .badge-critical {
-  background: #2b1517;
-  color: #f85149;
-  border: 1px solid #4d1c20;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fee2e2;
 }
 
 .status-open {
-  background: #111f38;
-  color: #58a6ff;
-  border: 1px solid #1f355c;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #dbeafe;
 }
 .status-in_progress {
-  background: #2b1f11;
-  color: #d29922;
-  border: 1px solid #4a341b;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fef3c7;
 }
 .status-resolved {
-  background: #102419;
-  color: #3fb950;
-  border: 1px solid #1a4d2e;
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #dcfce7;
 }
 .status-closed {
-  background: #181d28;
-  color: #8b949e;
-  border: 1px solid #30363d;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
 }
 
 /* Buttons */
@@ -133,13 +141,14 @@ body {
   border-radius: 6px;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s ease;
 }
 
 .btn-primary {
   background: var(--primary);
   color: #ffffff;
   border-color: var(--primary);
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
 }
 .btn-primary:hover {
   background: var(--primary-hover);
@@ -147,45 +156,43 @@ body {
 }
 
 .btn-secondary {
-  background: var(--bg-surface-elevated);
+  background: #ffffff;
   color: var(--text-primary);
   border-color: var(--border-medium);
 }
 .btn-secondary:hover {
-  background: #222933;
-  border-color: #484f58;
+  background: #f8fafc;
+  border-color: #94a3b8;
 }
 
 .btn-danger {
-  background: #2b1517;
-  color: #f85149;
-  border-color: #4d1c20;
+  background: #ffffff;
+  color: #dc2626;
+  border-color: #fecaca;
 }
 .btn-danger:hover {
-  background: #39191d;
-  border-color: #6e252a;
+  background: #fef2f2;
 }
 
 .btn-success {
-  background: #102419;
-  color: #3fb950;
-  border-color: #1a4d2e;
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
 }
 .btn-success:hover {
-  background: #173824;
-  border-color: #246e41;
+  background: #dcfce7;
 }
 
 .btn-xs {
-  padding: 3px 8px;
+  padding: 4px 8px;
   font-size: 11.5px;
-  border-radius: 4px;
+  border-radius: 5px;
 }
 
 /* Form inputs */
 input, select, textarea {
   width: 100%;
-  background: var(--bg-subtle);
+  background: #ffffff;
   border: 1px solid var(--border-medium);
   border-radius: 6px;
   padding: 8px 12px;
@@ -197,15 +204,16 @@ input, select, textarea {
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: var(--border-focus);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 /* Modal Backdrop */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,19 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
-// Preset lists aligned with .agents/AGENTS.md contract
+// Preset lists aligned with database records
 const USERS = [
-  { id: 101, name: 'Aarav Sharma (Engineering)' },
-  { id: 102, name: 'Priya Patel (Engineering)' },
-  { id: 103, name: 'Rohan Iyer (Human Resources)' },
-  { id: 104, name: 'Ananya Verma (Finance)' },
-  { id: 105, name: 'Aditya Nair (Operations)' },
-  { id: 106, name: 'Sneha Kulkarni (Operations)' },
+  { id: 101, name: 'Aarav Sharma', dept: 'Engineering', email: 'aarav.sharma@company.com' },
+  { id: 102, name: 'Priya Patel', dept: 'Engineering', email: 'priya.patel@company.com' },
+  { id: 103, name: 'Rohan Iyer', dept: 'Human Resources', email: 'rohan.iyer@company.com' },
+  { id: 104, name: 'Ananya Verma', dept: 'Finance', email: 'ananya.verma@company.com' },
+  { id: 105, name: 'Aditya Nair', dept: 'Operations', email: 'aditya.nair@company.com' },
+  { id: 106, name: 'Sneha Kulkarni', dept: 'Operations', email: 'sneha.kulkarni@company.com' },
 ];
 
 const TECHNICIANS = [
-  { id: 201, name: 'Vikram Malhotra (IT Support)' },
-  { id: 202, name: 'Neha Sengupta (IT Support)' },
-  { id: 203, name: 'Rahul Deshmukh (IT Support)' },
+  { id: 201, name: 'Vikram Malhotra', dept: 'IT Support' },
+  { id: 202, name: 'Neha Sengupta', dept: 'IT Support' },
+  { id: 203, name: 'Rahul Deshmukh', dept: 'IT Support' },
 ];
 
 const CATEGORIES = [
@@ -37,6 +37,11 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+
+  // Modals & UI Toggles
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [showSqlDetails, setShowSqlDetails] = useState(false);
 
   // New Ticket Form State
   const [formData, setFormData] = useState({
@@ -109,12 +114,13 @@ export default function App() {
         throw new Error(data.message || 'Failed to submit ticket');
       }
 
-      showToast(`Ticket #${data.data.ticket_id} created in Oracle Database!`, 'success');
+      showToast(`Ticket #${data.data.ticket_id} created successfully!`, 'success');
       setFormData({
         user_id: 101,
         issue_category: 'NETWORK',
         priority_level: 'MEDIUM',
       });
+      setIsCreateModalOpen(false);
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
@@ -134,7 +140,7 @@ export default function App() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
 
-      showToast(`Ticket #${ticketId} status updated to ${newStatus}`, 'success');
+      showToast(`Ticket #${ticketId} moved to ${newStatus.replace('_', ' ')}`, 'success');
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
@@ -149,7 +155,7 @@ export default function App() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
 
-      showToast(`Ticket #${ticketId} removed.`, 'success');
+      showToast(`Ticket #${ticketId} deleted.`, 'success');
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
@@ -165,7 +171,8 @@ export default function App() {
     }
     setResolving(true);
     try {
-      const res = await fetch(`/api/tickets/${resolvingTicket.TICKET_ID || resolvingTicket.ticket_id}/resolve`, {
+      const ticketId = resolvingTicket.TICKET_ID || resolvingTicket.ticket_id;
+      const res = await fetch(`/api/tickets/${ticketId}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(resolveData),
@@ -173,7 +180,7 @@ export default function App() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
 
-      showToast(`Incident #${resolvingTicket.TICKET_ID || resolvingTicket.ticket_id} resolved!`, 'success');
+      showToast(`Ticket #${ticketId} resolved successfully.`, 'success');
       setResolvingTicket(null);
       setResolveData({ technician_id: 201, resolution_notes: '' });
       fetchData();
@@ -184,199 +191,681 @@ export default function App() {
     }
   };
 
+  // Helper for Initials
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
   // Filtered Tickets
   const filteredTickets = tickets.filter((t) => {
     const id = String(t.TICKET_ID || t.ticket_id || '');
     const reporter = String(t.REPORTER_NAME || t.reporter_name || '').toLowerCase();
-    const cat = String(t.ISSUE_CATEGORY || t.issue_category || '').toLowerCase();
+    const cat = String(t.ISSUE_CATEGORY || t.issue_category || '').toUpperCase();
     const status = String(t.STATUS || t.status || '').toUpperCase();
     const priority = String(t.PRIORITY_LEVEL || t.priority_level || '').toUpperCase();
 
     const matchesSearch =
-      id.includes(search) || reporter.includes(search.toLowerCase()) || cat.includes(search.toLowerCase());
+      id.includes(search) || reporter.includes(search.toLowerCase()) || cat.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
     const matchesPriority = priorityFilter === 'ALL' || priority === priorityFilter;
+    const matchesCategory = categoryFilter === 'ALL' || cat === categoryFilter;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
   });
 
   return (
-    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px', width: '100%' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app)', display: 'flex', flexDirection: 'column' }}>
       {/* Toast Notification */}
       {notification && (
         <div
           style={{
             position: 'fixed',
-            top: '20px',
-            right: '20px',
+            bottom: '24px',
+            right: '24px',
             zIndex: 1000,
-            padding: '10px 16px',
-            borderRadius: '6px',
-            background: notification.type === 'danger' ? '#2b1517' : '#102419',
-            border: notification.type === 'danger' ? '1px solid #4d1c20' : '1px solid #1a4d2e',
-            color: notification.type === 'danger' ? '#f85149' : '#3fb950',
+            padding: '12px 18px',
+            borderRadius: '8px',
+            background: notification.type === 'danger' ? '#fef2f2' : '#f0fdf4',
+            border: notification.type === 'danger' ? '1px solid #fee2e2' : '1px solid #bbf7d0',
+            color: notification.type === 'danger' ? '#b91c1c' : '#15803d',
             fontSize: '13px',
             fontWeight: 500,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            boxShadow: 'var(--shadow-md)',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            gap: '10px',
           }}
         >
-          <span>{notification.type === 'danger' ? '•' : '✓'}</span>
+          <span>{notification.type === 'danger' ? '⚠️' : '✓'}</span>
           <span>{notification.message}</span>
         </div>
       )}
 
-      {/* Top Navbar Header */}
+      {/* Top Navbar */}
       <header
-        className="card"
         style={{
-          padding: '16px 20px',
-          marginBottom: '20px',
+          background: '#ffffff',
+          borderBottom: '1px solid var(--border-subtle)',
+          padding: '0 28px',
+          height: '64px',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '16px',
+          justifyContent: 'space-between',
+          position: 'sticky',
+          top: 0,
+          zIndex: 40,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '6px',
-              background: '#1f2937',
-              border: '1px solid #374151',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#60a5fa',
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
-              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
-              <line x1="6" y1="6" x2="6.01" y2="6"></line>
-              <line x1="6" y1="18" x2="6.01" y2="18"></line>
-            </svg>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
+          {/* Brand */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: '#2563eb',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                boxShadow: '0 2px 4px rgba(37,99,235,0.25)',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+              </svg>
+            </div>
+            <div>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                ServiceDesk
+              </span>
+            </div>
           </div>
-          <div>
-            <h1 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-              IT Service Desk &bull; Incident Command
-            </h1>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
-              Autonomous Database 26ai (mTLS) &bull; Arnav's Module (Ticket Management)
-            </p>
-          </div>
+
+          {/* Navigation Links */}
+          <nav style={{ display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => { setStatusFilter('ALL'); setCategoryFilter('ALL'); setPriorityFilter('ALL'); }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: statusFilter === 'ALL' && categoryFilter === 'ALL' ? '#2563eb' : '#475569',
+                cursor: 'pointer',
+              }}
+            >
+              All Tickets
+            </button>
+            <button
+              onClick={() => setStatusFilter('OPEN')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: statusFilter === 'OPEN' ? '#2563eb' : '#475569',
+                cursor: 'pointer',
+              }}
+            >
+              Needs Triage
+            </button>
+            <button
+              onClick={() => setStatusFilter('RESOLVED')}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '13px',
+                fontWeight: 500,
+                color: statusFilter === 'RESOLVED' ? '#2563eb' : '#475569',
+                cursor: 'pointer',
+              }}
+            >
+              Resolved
+            </button>
+          </nav>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Right Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
               padding: '4px 10px',
-              background: '#102419',
-              border: '1px solid #1a4d2e',
-              borderRadius: '4px',
+              background: '#f0fdf4',
+              border: '1px solid #dcfce7',
+              borderRadius: '20px',
               fontSize: '12px',
               fontWeight: 500,
-              color: '#3fb950',
+              color: '#16a34a',
             }}
           >
-            <span
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: '#3fb950',
-              }}
-            />
-            Database Connected
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
+            System Live
           </div>
 
-          <button onClick={fetchData} className="btn btn-secondary btn-xs" title="Refresh Live Data">
-            Refresh Data
+          <button onClick={fetchData} className="btn btn-secondary btn-xs" title="Refresh data">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            Refresh
+          </button>
+
+          <button onClick={() => setIsCreateModalOpen(true)} className="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            New Ticket
           </button>
         </div>
       </header>
 
-      {/* KPI Metrics Row */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '14px',
-          marginBottom: '20px',
-        }}
-      >
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            Total Incidents
+      {/* Main Container */}
+      <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+        {/* KPI Metric Summary Ribbon */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+            gap: '16px',
+            marginBottom: '24px',
+          }}
+        >
+          <div className="card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+              Total Incidents
+            </div>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+              {metrics?.totalTickets ?? tickets.length}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+              All tickets logged
+            </div>
           </div>
-          <div style={{ fontSize: '26px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
-            {metrics?.totalTickets ?? tickets.length}
+
+          <div className="card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 500, color: '#1d4ed8' }}>
+              In Progress / Triage
+            </div>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: '#1d4ed8', marginTop: '4px' }}>
+              {metrics?.openTickets ?? 0}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+              Active queue
+            </div>
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Table: TICKETS</div>
+
+          <div className="card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 500, color: '#b91c1c' }}>
+              Critical Attention
+            </div>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: '#b91c1c', marginTop: '4px' }}>
+              {metrics?.criticalTickets ?? 0}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+              High priority SLA
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 500, color: '#15803d' }}>
+              Resolved Incidents
+            </div>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: '#15803d', marginTop: '4px' }}>
+              {metrics?.resolvedTickets ?? 0}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+              Closed & completed
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+              Avg Turnaround Time
+            </div>
+            <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+              {metrics?.avgTurnaroundHours ? `${metrics.avgTurnaroundHours}h` : '4.25h'}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+              Average resolution speed
+            </div>
+          </div>
         </div>
 
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', color: '#58a6ff', fontWeight: 500 }}>
-            Active / In-Queue
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 600, color: '#58a6ff', marginTop: '4px' }}>
-            {metrics?.openTickets ?? 0}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Status: OPEN / IN_PROGRESS</div>
-        </div>
+        {/* Content Split: Sidebar (Filters & Queue Analytics) + Main Table */}
+        <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '24px', alignItems: 'start' }}>
+          {/* Sidebar */}
+          <aside style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {/* Quick Views */}
+            <div className="card" style={{ padding: '16px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                Quick Views
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {[
+                  { id: 'ALL', label: 'All Tickets', count: tickets.length },
+                  { id: 'OPEN', label: 'Needs Triage', count: tickets.filter(t => (t.STATUS || t.status) === 'OPEN').length },
+                  { id: 'IN_PROGRESS', label: 'In Investigation', count: tickets.filter(t => (t.STATUS || t.status) === 'IN_PROGRESS').length },
+                  { id: 'RESOLVED', label: 'Resolved', count: tickets.filter(t => (t.STATUS || t.status) === 'RESOLVED').length },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setStatusFilter(item.id)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '7px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: statusFilter === item.id ? '#eff6ff' : 'transparent',
+                      color: statusFilter === item.id ? '#2563eb' : '#334155',
+                      fontSize: '13px',
+                      fontWeight: statusFilter === item.id ? 600 : 500,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span>{item.label}</span>
+                    <span
+                      style={{
+                        fontSize: '11.5px',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        background: statusFilter === item.id ? '#dbeafe' : '#f1f5f9',
+                        color: statusFilter === item.id ? '#1d4ed8' : '#64748b',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {item.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', color: '#f85149', fontWeight: 500 }}>
-            Critical Attention
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 600, color: '#f85149', marginTop: '4px' }}>
-            {metrics?.criticalTickets ?? 0}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Immediate SLA response</div>
-        </div>
+            {/* Categories Filter */}
+            <div className="card" style={{ padding: '16px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
+                Filter by Category
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <button
+                  onClick={() => setCategoryFilter('ALL')}
+                  style={{
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: categoryFilter === 'ALL' ? '#eff6ff' : 'transparent',
+                    color: categoryFilter === 'ALL' ? '#2563eb' : '#475569',
+                    fontSize: '12.5px',
+                    fontWeight: categoryFilter === 'ALL' ? 600 : 400,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  All Categories
+                </button>
+                {CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCategoryFilter(cat.id)}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: categoryFilter === cat.id ? '#eff6ff' : 'transparent',
+                      color: categoryFilter === cat.id ? '#2563eb' : '#475569',
+                      fontSize: '12.5px',
+                      fontWeight: categoryFilter === cat.id ? 600 : 400,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', color: '#3fb950', fontWeight: 500 }}>
-            Resolved Tickets
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 600, color: '#3fb950', marginTop: '4px' }}>
-            {metrics?.resolvedTickets ?? 0}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Table: TICKET_RESOLUTIONS</div>
-        </div>
+            {/* Priority Queue Analytics (Review 1 Aggregation with HAVING >= 2) */}
+            <div className="card" style={{ padding: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Queue Volume
+                </div>
+                <button
+                  onClick={() => setShowSqlDetails(!showSqlDetails)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#2563eb',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  {showSqlDetails ? 'Hide SQL' : 'View SQL'}
+                </button>
+              </div>
 
-        <div className="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-            Avg Turnaround Time
-          </div>
-          <div style={{ fontSize: '26px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
-            {metrics?.avgTurnaroundHours ? `${metrics.avgTurnaroundHours}h` : '4.25h'}
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>SQL AVG Function</div>
-        </div>
-      </div>
+              {showSqlDetails && (
+                <pre
+                  style={{
+                    fontSize: '10px',
+                    color: '#475569',
+                    fontFamily: 'var(--font-mono)',
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    marginBottom: '10px',
+                    overflowX: 'auto',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+{`SELECT priority_level, COUNT(*)
+FROM TICKETS
+WHERE status IN ('OPEN', 'IN_PROGRESS')
+GROUP BY priority_level
+HAVING COUNT(*) >= 2;`}
+                </pre>
+              )}
 
-      {/* Main Grid: Form + Table */}
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '20px', alignItems: 'start' }}>
-        {/* Left Column: Ticket Submission & Analytical Query Box */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* New Ticket Form */}
-          <div className="card" style={{ padding: '18px' }}>
-            <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px' }}>
-              Create Incident Ticket
-            </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {metrics?.byPriority && metrics.byPriority.length > 0 ? (
+                  metrics.byPriority.map((row, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '6px 10px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                      }}
+                    >
+                      <span className={`badge badge-${(row.PRIORITY_LEVEL || row.priority_level || '').toLowerCase()}`}>
+                        {row.PRIORITY_LEVEL || row.priority_level}
+                      </span>
+                      <span style={{ color: '#0f172a', fontWeight: 600, fontSize: '12px' }}>
+                        {row.TOTAL_TICKETS_IN_QUEUE || row.total_tickets_in_queue} tickets
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No queues meet threshold</div>
+                )}
+              </div>
+            </div>
+          </aside>
 
-            <form onSubmit={handleSubmitTicket} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Main Table Area */}
+          <section className="card" style={{ padding: '0', overflow: 'hidden' }}>
+            {/* Filter Toolbar */}
+            <div
+              style={{
+                padding: '16px 20px',
+                borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
+                background: '#ffffff',
+              }}
+            >
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a' }}>
+                  Incident Registry
+                </span>
+                <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px' }}>
+                  ({filteredTickets.length} results)
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {/* Search */}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Search tickets..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{
+                      width: '210px',
+                      padding: '6px 10px 6px 30px',
+                      fontSize: '12.5px',
+                    }}
+                  />
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
+                  >
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </div>
+
+                {/* Priority Filter */}
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  style={{ width: '130px', padding: '6px 10px', fontSize: '12px' }}
+                >
+                  <option value="ALL">All Priorities</option>
+                  <option value="CRITICAL">Critical</option>
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table Content */}
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '13px' }}>Loading incident records...</div>
+              </div>
+            ) : error ? (
+              <div
+                style={{
+                  margin: '20px',
+                  padding: '16px',
+                  background: '#fef2f2',
+                  border: '1px solid #fee2e2',
+                  borderRadius: '6px',
+                  color: '#b91c1c',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '2px' }}>Database Notice</div>
+                <div style={{ fontSize: '12px' }}>{error}</div>
+              </div>
+            ) : filteredTickets.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+                No tickets matching your current filter.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', color: '#475569' }}>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>ID</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Requester</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Category</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Priority</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Status</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Created</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Resolution Details</th>
+                      <th style={{ padding: '10px 14px', fontWeight: 600, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTickets.map((t) => {
+                      const ticketId = t.TICKET_ID || t.ticket_id;
+                      const reporterName = t.REPORTER_NAME || t.reporter_name || `User #${t.USER_ID || t.user_id}`;
+                      const category = t.ISSUE_CATEGORY || t.issue_category;
+                      const priority = t.PRIORITY_LEVEL || t.priority_level;
+                      const status = (t.STATUS || t.status || '').toUpperCase();
+                      const createdDate = t.FORMATTED_CREATED_AT || t.formatted_created_at || 'Just now';
+                      const notes = t.RESOLUTION_NOTES || t.resolution_notes || 'Pending Triage';
+
+                      return (
+                        <tr
+                          key={ticketId}
+                          style={{
+                            borderBottom: '1px solid #f1f5f9',
+                            transition: 'background-color 0.1s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f8fafc')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                        >
+                          <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', color: '#2563eb', fontWeight: 600, fontSize: '12px' }}>
+                            #{ticketId}
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div
+                                style={{
+                                  width: '26px',
+                                  height: '26px',
+                                  borderRadius: '50%',
+                                  background: '#eff6ff',
+                                  border: '1px solid #dbeafe',
+                                  color: '#1d4ed8',
+                                  fontSize: '10.5px',
+                                  fontWeight: 700,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                {getInitials(reporterName)}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.2 }}>{reporterName}</div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>#{t.USER_ID || t.user_id}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <span style={{ color: '#334155', fontWeight: 500 }}>
+                              {CATEGORIES.find((c) => c.id === category)?.label || category}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <span className={`badge badge-${priority.toLowerCase()}`}>{priority}</span>
+                          </td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <span className={`badge status-${status.toLowerCase()}`}>{status.replace('_', ' ')}</span>
+                          </td>
+                          <td style={{ padding: '12px 14px', fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {createdDate}
+                          </td>
+                          <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
+                            <div
+                              style={{
+                                fontSize: '12px',
+                                color: status === 'RESOLVED' ? '#15803d' : '#64748b',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={notes}
+                            >
+                              {notes}
+                            </div>
+                            {t.TECHNICIAN_NAME && (
+                              <div style={{ fontSize: '11px', color: '#2563eb', marginTop: '2px', fontWeight: 500 }}>
+                                Tech: {t.TECHNICIAN_NAME}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '6px' }}>
+                              {status === 'OPEN' && (
+                                <button
+                                  onClick={() => handleUpdateStatus(ticketId, 'IN_PROGRESS')}
+                                  className="btn btn-secondary btn-xs"
+                                  title="Mark as In Progress"
+                                >
+                                  Triage
+                                </button>
+                              )}
+                              {(status === 'OPEN' || status === 'IN_PROGRESS') && (
+                                <button
+                                  onClick={() => setResolvingTicket(t)}
+                                  className="btn btn-success btn-xs"
+                                  title="Resolve ticket"
+                                >
+                                  Resolve
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteTicket(ticketId)}
+                                className="btn btn-danger btn-xs"
+                                title="Delete"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
+
+      {/* New Ticket Modal */}
+      {isCreateModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsCreateModalOpen(false)}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '460px', padding: '24px', background: '#ffffff', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                Create Support Ticket
+              </h2>
+              <button
+                onClick={() => setIsCreateModalOpen(false)}
+                style={{ background: 'transparent', border: 'none', fontSize: '18px', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                   Requester
                 </label>
                 <select
@@ -386,15 +875,15 @@ export default function App() {
                 >
                   {USERS.map((u) => (
                     <option key={u.id} value={u.id}>
-                      #{u.id} &bull; {u.name}
+                      {u.name} ({u.dept})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Category
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Issue Category
                 </label>
                 <select
                   value={formData.issue_category}
@@ -403,17 +892,17 @@ export default function App() {
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.label} ({c.id})
+                      {c.label}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
                   Priority Level
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
                   {PRIORITIES.map((p) => {
                     const isSelected = formData.priority_level === p;
                     return (
@@ -422,11 +911,11 @@ export default function App() {
                         key={p}
                         onClick={() => setFormData({ ...formData, priority_level: p })}
                         style={{
-                          padding: '6px 8px',
-                          borderRadius: '4px',
-                          border: isSelected ? '1px solid #3b82f6' : '1px solid var(--border-medium)',
-                          background: isSelected ? '#1c2638' : 'var(--bg-subtle)',
-                          color: isSelected ? '#58a6ff' : 'var(--text-secondary)',
+                          padding: '7px 4px',
+                          borderRadius: '6px',
+                          border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                          background: isSelected ? '#eff6ff' : '#ffffff',
+                          color: isSelected ? '#1d4ed8' : '#475569',
                           fontSize: '11px',
                           fontWeight: 600,
                           cursor: 'pointer',
@@ -439,267 +928,39 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="btn btn-primary"
-                style={{ width: '100%', marginTop: '4px' }}
-              >
-                {submitting ? 'Inserting...' : 'Submit Ticket'}
-              </button>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="btn btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" disabled={submitting} className="btn btn-primary">
+                  {submitting ? 'Creating...' : 'Create Ticket'}
+                </button>
+              </div>
             </form>
           </div>
-
-          {/* Review 1 Analytical Query Card (Query 2.1 Live Display) */}
-          <div className="card" style={{ padding: '16px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-              Review 1 SQL Query &bull; Priority Queue
-            </div>
-            <pre style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)', padding: '8px', borderRadius: '4px', marginBottom: '12px', overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
-{`SELECT priority_level, COUNT(*)
-FROM TICKETS
-WHERE status IN ('OPEN', 'IN_PROGRESS')
-GROUP BY priority_level
-HAVING COUNT(*) >= 2;`}
-            </pre>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {metrics?.byPriority && metrics.byPriority.length > 0 ? (
-                metrics.byPriority.map((row, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '6px 8px',
-                      background: 'var(--bg-subtle)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '4px',
-                      fontSize: '12px',
-                    }}
-                  >
-                    <span className={`badge badge-${(row.PRIORITY_LEVEL || row.priority_level || '').toLowerCase()}`}>
-                      {row.PRIORITY_LEVEL || row.priority_level}
-                    </span>
-                    <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: '12px' }}>
-                      {row.TOTAL_TICKETS_IN_QUEUE || row.total_tickets_in_queue} in queue
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No queues meet HAVING &gt;= 2 threshold</div>
-              )}
-            </div>
-          </div>
         </div>
-
-        {/* Right Column: Live Data Grid */}
-        <div className="card" style={{ padding: '18px', overflow: 'hidden' }}>
-          {/* Table Toolbar */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '12px',
-              marginBottom: '16px',
-            }}
-          >
-            <div>
-              <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Incident Registry
-              </h2>
-              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                {filteredTickets.length} of {tickets.length} tickets recorded
-              </span>
-            </div>
-
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                placeholder="Search ticket, reporter..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{ width: '200px', padding: '6px 10px', fontSize: '12px' }}
-              />
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ width: '120px', padding: '6px 8px', fontSize: '12px' }}
-              >
-                <option value="ALL">All Statuses</option>
-                <option value="OPEN">OPEN</option>
-                <option value="IN_PROGRESS">IN PROGRESS</option>
-                <option value="RESOLVED">RESOLVED</option>
-                <option value="CLOSED">CLOSED</option>
-              </select>
-
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-                style={{ width: '120px', padding: '6px 8px', fontSize: '12px' }}
-              >
-                <option value="ALL">All Priorities</option>
-                <option value="CRITICAL">CRITICAL</option>
-                <option value="HIGH">HIGH</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="LOW">LOW</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Incident Table */}
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
-              <div style={{ fontSize: '13px' }}>Querying Oracle Database...</div>
-            </div>
-          ) : error ? (
-            <div
-              style={{
-                padding: '16px',
-                background: '#2b1517',
-                border: '1px solid #4d1c20',
-                borderRadius: '6px',
-                color: '#f85149',
-                textAlign: 'center',
-              }}
-            >
-              <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>Database Connection Notice</div>
-              <div style={{ fontSize: '12px' }}>{error}</div>
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-              No tickets found matching the specified filters.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-medium)', background: 'var(--bg-subtle)', color: 'var(--text-secondary)' }}>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>ID</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Requester</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Category</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Priority</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Status</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Submitted</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Resolution Notes</th>
-                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTickets.map((t) => {
-                    const ticketId = t.TICKET_ID || t.ticket_id;
-                    const reporterName = t.REPORTER_NAME || t.reporter_name || `User #${t.USER_ID || t.user_id}`;
-                    const category = t.ISSUE_CATEGORY || t.issue_category;
-                    const priority = t.PRIORITY_LEVEL || t.priority_level;
-                    const status = (t.STATUS || t.status || '').toUpperCase();
-                    const createdDate = t.FORMATTED_CREATED_AT || t.formatted_created_at || 'Just now';
-                    const notes = t.RESOLUTION_NOTES || t.resolution_notes || 'Pending Triage';
-
-                    return (
-                      <tr
-                        key={ticketId}
-                        style={{
-                          borderBottom: '1px solid var(--border-subtle)',
-                        }}
-                      >
-                        <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', fontSize: '12px' }}>
-                          #{ticketId}
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{reporterName}</div>
-                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>ID #{t.USER_ID || t.user_id}</div>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span style={{ color: 'var(--text-secondary)' }}>{category}</span>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span className={`badge badge-${priority.toLowerCase()}`}>{priority}</span>
-                        </td>
-                        <td style={{ padding: '10px' }}>
-                          <span className={`badge status-${status.toLowerCase()}`}>{status}</span>
-                        </td>
-                        <td style={{ padding: '10px', fontSize: '11.5px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-                          {createdDate}
-                        </td>
-                        <td style={{ padding: '10px', maxWidth: '220px' }}>
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              color: status === 'RESOLVED' ? '#3fb950' : 'var(--text-tertiary)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={notes}
-                          >
-                            {notes}
-                          </div>
-                          {t.TECHNICIAN_NAME && (
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                              Tech: {t.TECHNICIAN_NAME}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ padding: '10px', textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', gap: '6px' }}>
-                            {status === 'OPEN' && (
-                              <button
-                                onClick={() => handleUpdateStatus(ticketId, 'IN_PROGRESS')}
-                                className="btn btn-secondary btn-xs"
-                                title="Move to In Progress"
-                              >
-                                Triage
-                              </button>
-                            )}
-                            {(status === 'OPEN' || status === 'IN_PROGRESS') && (
-                              <button
-                                onClick={() => setResolvingTicket(t)}
-                                className="btn btn-success btn-xs"
-                                title="Record Resolution Notes"
-                              >
-                                Resolve
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDeleteTicket(ticketId)}
-                              className="btn btn-danger btn-xs"
-                              title="Delete Ticket"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Resolution Modal */}
       {resolvingTicket && (
-        <div className="modal-overlay">
-          <div className="card" style={{ width: '480px', padding: '20px', background: 'var(--bg-surface-elevated)' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <div className="modal-overlay" onClick={() => setResolvingTicket(null)}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '480px', padding: '24px', background: '#ffffff', boxShadow: 'var(--shadow-lg)' }}>
+            <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
               Resolve Incident #{resolvingTicket.TICKET_ID || resolvingTicket.ticket_id}
             </h2>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+            <p style={{ fontSize: '12.5px', color: '#64748b', marginBottom: '16px' }}>
               Category: <strong>{resolvingTicket.ISSUE_CATEGORY || resolvingTicket.issue_category}</strong> &bull; Priority:{' '}
               <strong>{resolvingTicket.PRIORITY_LEVEL || resolvingTicket.priority_level}</strong>
             </p>
 
-            <form onSubmit={handleResolveTicket} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <form onSubmit={handleResolveTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Resolving Technician
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Assigned Technician
                 </label>
                 <select
                   value={resolveData.technician_id}
@@ -708,35 +969,35 @@ HAVING COUNT(*) >= 2;`}
                 >
                   {TECHNICIANS.map((tech) => (
                     <option key={tech.id} value={tech.id}>
-                      #{tech.id} &bull; {tech.name}
+                      {tech.name} ({tech.dept})
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-                  Technical Resolution Notes (NOT NULL)
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                  Technical Work Notes & Actions Taken
                 </label>
                 <textarea
                   rows={4}
-                  placeholder="Detail the technical steps taken to resolve this incident..."
+                  placeholder="Describe the steps performed to resolve this incident..."
                   value={resolveData.resolution_notes}
                   onChange={(e) => setResolveData({ ...resolveData, resolution_notes: e.target.value })}
                   required
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setResolvingTicket(null)}
-                  className="btn btn-secondary btn-xs"
+                  className="btn btn-secondary"
                 >
                   Cancel
                 </button>
-                <button type="submit" disabled={resolving} className="btn btn-primary btn-xs">
-                  {resolving ? 'Submitting...' : 'Commit Resolution'}
+                <button type="submit" disabled={resolving} className="btn btn-primary">
+                  {resolving ? 'Submitting...' : 'Mark as Resolved'}
                 </button>
               </div>
             </form>
