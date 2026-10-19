@@ -2,18 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 // Preset lists aligned with .agents/AGENTS.md contract
 const USERS = [
-  { id: 101, name: 'Alice Smith (Engineering)' },
-  { id: 102, name: 'Bob Jones (Human Resources)' },
-  { id: 103, name: 'Charlie Brown (Finance)' },
-  { id: 104, name: 'Diana Prince (Engineering)' },
-  { id: 105, name: 'Evan Wright (Operations)' },
-  { id: 106, name: 'Fiona Gallagher (Finance)' },
+  { id: 101, name: 'Aarav Sharma (Engineering)' },
+  { id: 102, name: 'Priya Patel (Engineering)' },
+  { id: 103, name: 'Rohan Iyer (Human Resources)' },
+  { id: 104, name: 'Ananya Verma (Finance)' },
+  { id: 105, name: 'Aditya Nair (Operations)' },
+  { id: 106, name: 'Sneha Kulkarni (Operations)' },
 ];
 
 const TECHNICIANS = [
-  { id: 201, name: 'Kevin Mitnick (IT Support)' },
-  { id: 202, name: 'Ada Lovelace (IT Support)' },
-  { id: 203, name: 'Linus Torvalds (IT Support)' },
+  { id: 201, name: 'Vikram Malhotra (IT Support)' },
+  { id: 202, name: 'Neha Sengupta (IT Support)' },
+  { id: 203, name: 'Rahul Deshmukh (IT Support)' },
 ];
 
 const CATEGORIES = [
