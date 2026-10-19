@@ -26,7 +26,50 @@ const CATEGORIES = [
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
+// Demo Profiles for Multi-Persona Role Switching (POC)
+// Role Categories for Multi-Persona Role Switching (POC)
+const PROFILES = {
+  USER: {
+    key: 'USER',
+    role: 'USER',
+    label: 'End User',
+    title: 'Employee Self-Service Portal',
+    desc: 'Campus employee view. Can submit support tickets and monitor status. Cannot triage, resolve, or delete tickets.',
+    permissionTag: 'Submit Only',
+    avatarBg: '#dbeafe',
+    avatarColor: '#1d4ed8',
+    icon: '👤',
+  },
+  ENGINEER: {
+    key: 'ENGINEER',
+    role: 'TECHNICIAN',
+    label: 'Support Engineer',
+    title: 'Technical Incident Workbench',
+    desc: 'IT Technician view. Can investigate and resolve active incidents. Organization staff directory is read-only.',
+    permissionTag: 'Triage & Resolve',
+    avatarBg: '#fef3c7',
+    avatarColor: '#b45309',
+    icon: '🛠️',
+  },
+  ADMIN: {
+    key: 'ADMIN',
+    role: 'ADMIN',
+    label: 'System Admin',
+    title: 'Administrative Control Center',
+    desc: 'Superuser view. Full governance across ticket lifecycles, resolutions, deletions, and employee directory management.',
+    permissionTag: 'Full Superuser Access',
+    avatarBg: '#ede9fe',
+    avatarColor: '#6d28d9',
+    icon: '🛡️',
+  },
+};
+
 export default function App() {
+  // Active Profile State (POC Persona Switcher)
+  const [activeProfileKey, setActiveProfileKey] = useState('ADMIN');
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const currentProfile = PROFILES[activeProfileKey];
+
   // Navigation Tab: 'tickets' (Arnav's module) vs 'organization' (Shobit's module)
   const [activeTab, setActiveTab] = useState('tickets');
 
@@ -382,73 +425,45 @@ export default function App() {
             <button
               onClick={() => { setActiveTab('tickets'); setStatusFilter('ALL'); setCategoryFilter('ALL'); setPriorityFilter('ALL'); }}
               style={{
-                background: activeTab === 'tickets' && statusFilter === 'ALL' && categoryFilter === 'ALL' ? '#eff6ff' : 'transparent',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: activeTab === 'tickets' && statusFilter === 'ALL' ? 600 : 500,
-                color: activeTab === 'tickets' && statusFilter === 'ALL' ? '#2563eb' : '#475569',
-                cursor: 'pointer',
-              }}
-            >
-              All Tickets
-            </button>
-            <button
-              onClick={() => { setActiveTab('tickets'); setStatusFilter('OPEN'); }}
-              style={{
-                background: activeTab === 'tickets' && statusFilter === 'OPEN' ? '#eff6ff' : 'transparent',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: activeTab === 'tickets' && statusFilter === 'OPEN' ? 600 : 500,
-                color: activeTab === 'tickets' && statusFilter === 'OPEN' ? '#2563eb' : '#475569',
-                cursor: 'pointer',
-              }}
-            >
-              Needs Triage
-            </button>
-            <button
-              onClick={() => { setActiveTab('tickets'); setStatusFilter('RESOLVED'); }}
-              style={{
-                background: activeTab === 'tickets' && statusFilter === 'RESOLVED' ? '#eff6ff' : 'transparent',
-                border: 'none',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: activeTab === 'tickets' && statusFilter === 'RESOLVED' ? 600 : 500,
-                color: activeTab === 'tickets' && statusFilter === 'RESOLVED' ? '#2563eb' : '#475569',
-                cursor: 'pointer',
-              }}
-            >
-              Resolved
-            </button>
-
-            {/* Shobit's Module Tab */}
-            <button
-              onClick={() => setActiveTab('organization')}
-              style={{
-                background: activeTab === 'organization' ? '#eff6ff' : 'transparent',
+                background: activeTab === 'tickets' ? '#eff6ff' : 'transparent',
                 border: 'none',
                 padding: '6px 14px',
                 borderRadius: '6px',
                 fontSize: '13px',
-                fontWeight: activeTab === 'organization' ? 600 : 500,
-                color: activeTab === 'organization' ? '#2563eb' : '#475569',
+                fontWeight: activeTab === 'tickets' ? 600 : 500,
+                color: activeTab === 'tickets' ? '#2563eb' : '#475569',
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
               }}
             >
-              <span>🏢</span> Organization & Staff
+              Incident Tickets
             </button>
+
+            {/* Shobit's Module Tab - Restricted for User Role */}
+            {currentProfile.role !== 'USER' && (
+              <button
+                onClick={() => setActiveTab('organization')}
+                style={{
+                  background: activeTab === 'organization' ? '#eff6ff' : 'transparent',
+                  border: 'none',
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: activeTab === 'organization' ? 600 : 500,
+                  color: activeTab === 'organization' ? '#2563eb' : '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>🏢</span> Organization & Staff
+              </button>
+            )}
           </nav>
         </div>
 
-        {/* Right Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {/* Right Actions & Profile Switcher */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
               display: 'inline-flex',
@@ -464,7 +479,7 @@ export default function App() {
             }}
           >
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
-            Oracle ADB 26ai Live
+            System Live
           </div>
 
           <button onClick={fetchData} className="btn btn-secondary btn-xs" title="Refresh live database data">
@@ -476,23 +491,205 @@ export default function App() {
             Refresh
           </button>
 
+          {/* Contextual Action Button based on Tab & Role */}
           {activeTab === 'tickets' ? (
-            <button onClick={() => setIsCreateModalOpen(true)} className="btn btn-primary">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              New Ticket
-            </button>
+            (currentProfile.role === 'USER' || currentProfile.role === 'ADMIN') && (
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="btn btn-primary"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Ticket
+              </button>
+            )
           ) : (
-            <button onClick={() => setIsEmpModalOpen(true)} className="btn btn-primary">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Add Employee
-            </button>
+            currentProfile.role === 'ADMIN' && (
+              <button onClick={() => setIsEmpModalOpen(true)} className="btn btn-primary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Add Employee
+              </button>
+            )
           )}
+
+          {/* Google-Style Category Switcher */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                borderRadius: '24px',
+                background: currentProfile.avatarBg,
+                border: `1.5px solid ${currentProfile.avatarColor}44`,
+                color: currentProfile.avatarColor,
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: 'var(--shadow-sm)',
+                transition: 'all 0.15s ease',
+              }}
+              title={`Active Category: ${currentProfile.label} (Click to switch)`}
+            >
+              <span style={{ fontSize: '15px' }}>{currentProfile.icon}</span>
+              <span>{currentProfile.label}</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ opacity: 0.7, transform: isProfileMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+            {/* Backdrop click to close */}
+            {isProfileMenuOpen && (
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: 50 }}
+                onClick={() => setIsProfileMenuOpen(false)}
+              />
+            )}
+
+            {/* Role Category Popover Menu */}
+            {isProfileMenuOpen && (
+              <div
+                className="card"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '46px',
+                  width: '320px',
+                  padding: '16px',
+                  zIndex: 60,
+                  boxShadow: 'var(--shadow-lg)',
+                  borderRadius: '12px',
+                  background: '#ffffff',
+                }}
+              >
+                {/* Active Category Card */}
+                <div style={{ textAlign: 'center', paddingBottom: '14px', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <div
+                    style={{
+                      width: '46px',
+                      height: '46px',
+                      borderRadius: '50%',
+                      background: currentProfile.avatarBg,
+                      fontSize: '22px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 8px auto',
+                      border: `2px solid ${currentProfile.avatarColor}`,
+                    }}
+                  >
+                    {currentProfile.icon}
+                  </div>
+                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '15px' }}>
+                    {currentProfile.label}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>
+                    {currentProfile.title}
+                  </div>
+                  <div style={{ marginTop: '6px' }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '2px 10px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        background: currentProfile.avatarBg,
+                        color: currentProfile.avatarColor,
+                      }}
+                    >
+                      {currentProfile.permissionTag}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '8px', lineHeight: 1.4 }}>
+                    {currentProfile.desc}
+                  </div>
+                </div>
+
+                {/* Switch Roles Section */}
+                <div style={{ paddingTop: '12px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                    Select Role Category
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {Object.entries(PROFILES).map(([key, p]) => {
+                      const isCurrent = key === activeProfileKey;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => {
+                            setActiveProfileKey(key);
+                            setIsProfileMenuOpen(false);
+                            if (p.role === 'USER') {
+                              setActiveTab('tickets');
+                            }
+                            showToast(`Switched active category to ${p.label}`, 'success');
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: isCurrent ? '1.5px solid #2563eb' : '1px solid var(--border-subtle)',
+                            background: isCurrent ? '#eff6ff' : '#f8fafc',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'background 0.15s ease',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '8px',
+                              background: p.avatarBg,
+                              fontSize: '16px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {p.icon}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                              {p.label}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#64748b' }}>
+                              {p.permissionTag}
+                            </div>
+                          </div>
+                          {isCurrent && (
+                            <span style={{ color: '#2563eb', fontWeight: 700, fontSize: '13px' }}>✓</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -583,6 +780,44 @@ export default function App() {
                     Quick Views
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {currentProfile.role === 'USER' && (
+                      <button
+                        onClick={() => {
+                          setStatusFilter('ALL');
+                          setCategoryFilter('ALL');
+                          setPriorityFilter('ALL');
+                          setSearch(String(currentProfile.id));
+                        }}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '7px 10px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: search === String(currentProfile.id) ? '#eff6ff' : 'transparent',
+                          color: search === String(currentProfile.id) ? '#2563eb' : '#0f172a',
+                          fontSize: '13px',
+                          fontWeight: search === String(currentProfile.id) ? 600 : 500,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span>📌 My Tickets</span>
+                        <span
+                          style={{
+                            fontSize: '11.5px',
+                            padding: '1px 6px',
+                            borderRadius: '10px',
+                            background: '#dbeafe',
+                            color: '#1d4ed8',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {tickets.filter(t => Number(t.USER_ID || t.user_id) === currentProfile.id).length}
+                        </span>
+                      </button>
+                    )}
                     {[
                       { id: 'ALL', label: 'All Tickets', count: tickets.length },
                       { id: 'OPEN', label: 'Needs Triage', count: tickets.filter(t => (t.STATUS || t.status) === 'OPEN').length },
@@ -591,7 +826,10 @@ export default function App() {
                     ].map((item) => (
                       <button
                         key={item.id}
-                        onClick={() => setStatusFilter(item.id)}
+                        onClick={() => {
+                          setStatusFilter(item.id);
+                          if (search === String(currentProfile.id)) setSearch('');
+                        }}
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -599,10 +837,10 @@ export default function App() {
                           padding: '7px 10px',
                           borderRadius: '6px',
                           border: 'none',
-                          background: statusFilter === item.id ? '#eff6ff' : 'transparent',
-                          color: statusFilter === item.id ? '#2563eb' : '#334155',
+                          background: statusFilter === item.id && search !== String(currentProfile.id) ? '#eff6ff' : 'transparent',
+                          color: statusFilter === item.id && search !== String(currentProfile.id) ? '#2563eb' : '#334155',
                           fontSize: '13px',
-                          fontWeight: statusFilter === item.id ? 600 : 500,
+                          fontWeight: statusFilter === item.id && search !== String(currentProfile.id) ? 600 : 500,
                           cursor: 'pointer',
                           textAlign: 'left',
                         }}
@@ -613,8 +851,8 @@ export default function App() {
                             fontSize: '11.5px',
                             padding: '1px 6px',
                             borderRadius: '10px',
-                            background: statusFilter === item.id ? '#dbeafe' : '#f1f5f9',
-                            color: statusFilter === item.id ? '#1d4ed8' : '#64748b',
+                            background: statusFilter === item.id && search !== String(currentProfile.id) ? '#dbeafe' : '#f1f5f9',
+                            color: statusFilter === item.id && search !== String(currentProfile.id) ? '#1d4ed8' : '#64748b',
                             fontWeight: 600,
                           }}
                         >
@@ -729,6 +967,86 @@ HAVING COUNT(*) >= 2;`}
 
               {/* Main Tickets Data Table */}
               <section className="card" style={{ padding: '20px', overflow: 'hidden' }}>
+                {/* Engineer Mode Active Queue Callout */}
+                {currentProfile.role === 'TECHNICIAN' && (
+                  <div
+                    style={{
+                      marginBottom: '16px',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      background: '#fffbeb',
+                      border: '1px solid #fef3c7',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '18px' }}>🛠️</span>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#92400e' }}>
+                          Support Engineer Workbench
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#b45309' }}>
+                          {tickets.filter(t => (t.STATUS || t.status) === 'OPEN').length} tickets waiting for triage &bull; {tickets.filter(t => (t.STATUS || t.status) === 'IN_PROGRESS').length} actively in progress.
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => setStatusFilter('OPEN')}
+                        className="btn btn-secondary btn-xs"
+                        style={{ borderColor: '#fde68a', background: '#ffffff', color: '#92400e' }}
+                      >
+                        Triage Queue
+                      </button>
+                      <button
+                        onClick={() => setStatusFilter('IN_PROGRESS')}
+                        className="btn btn-secondary btn-xs"
+                        style={{ borderColor: '#fde68a', background: '#ffffff', color: '#92400e' }}
+                      >
+                        In Progress
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* User Mode Greeting Banner */}
+                {currentProfile.role === 'USER' && (
+                  <div
+                    style={{
+                      marginBottom: '16px',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      background: '#eff6ff',
+                      border: '1px solid #dbeafe',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '18px' }}>👤</span>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e40af' }}>
+                          End User Support Portal
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#2563eb' }}>
+                          Submit IT support tickets and track resolution status in real time.
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="btn btn-primary btn-xs"
+                    >
+                      + New Ticket
+                    </button>
+                  </div>
+                )}
+
                 {/* Search & Priority Filter Toolbar */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
                   <div style={{ position: 'relative', width: '320px' }}>
@@ -883,29 +1201,47 @@ HAVING COUNT(*) >= 2;`}
                               </td>
                               <td style={{ padding: '12px', textAlign: 'right' }}>
                                 <div style={{ display: 'inline-flex', gap: '6px' }}>
-                                  {status === 'OPEN' && (
+                                  {/* Triage: Only for Engineer or Admin */}
+                                  {status === 'OPEN' && (currentProfile.role === 'TECHNICIAN' || currentProfile.role === 'ADMIN') && (
                                     <button
                                       onClick={() => handleUpdateStatus(ticketId, 'IN_PROGRESS')}
                                       className="btn btn-secondary btn-xs"
+                                      title="Move ticket to in-progress triage"
                                     >
                                       Investigate
                                     </button>
                                   )}
-                                  {(status === 'OPEN' || status === 'IN_PROGRESS') && (
+                                  {/* Resolve: Only for Engineer or Admin */}
+                                  {(status === 'OPEN' || status === 'IN_PROGRESS') && (currentProfile.role === 'TECHNICIAN' || currentProfile.role === 'ADMIN') && (
                                     <button
-                                      onClick={() => setResolvingTicket(t)}
+                                      onClick={() => {
+                                        setResolvingTicket(t);
+                                        if (currentProfile.role === 'TECHNICIAN') {
+                                          setResolveData(prev => ({ ...prev, technician_id: currentProfile.id }));
+                                        }
+                                      }}
                                       className="btn btn-success btn-xs"
+                                      title="Record Technical Resolution"
                                     >
                                       Resolve
                                     </button>
                                   )}
-                                  <button
-                                    onClick={() => handleDeleteTicket(ticketId)}
-                                    className="btn btn-danger btn-xs"
-                                    title="Delete ticket"
-                                  >
-                                    &times;
-                                  </button>
+                                  {/* Delete: Only for Admin */}
+                                  {currentProfile.role === 'ADMIN' && (
+                                    <button
+                                      onClick={() => handleDeleteTicket(ticketId)}
+                                      className="btn btn-danger btn-xs"
+                                      title="Delete ticket (Admin only)"
+                                    >
+                                      &times;
+                                    </button>
+                                  )}
+                                  {/* User View: Clean read-only status */}
+                                  {currentProfile.role === 'USER' && (
+                                    <span style={{ fontSize: '11px', color: isResolved ? '#15803d' : '#94a3b8', fontStyle: 'italic', fontWeight: isResolved ? 600 : 400 }}>
+                                      {isResolved ? 'Resolved' : 'Pending Triage'}
+                                    </span>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -1122,22 +1458,36 @@ HAVING COUNT(e.employee_id) >= 2;`}
                   </div>
                 </div>
 
-                {/* Quick Add Button Card */}
-                <div className="card" style={{ padding: '18px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                    Add Personnel
+                {/* Quick Add Button Card (Admin Only) or Read-Only Notice */}
+                {currentProfile.role === 'ADMIN' ? (
+                  <div className="card" style={{ padding: '18px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
+                      Add Personnel
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                      Inserts an employee record into Oracle with department foreign key binding.
+                    </p>
+                    <button
+                      onClick={() => setIsEmpModalOpen(true)}
+                      className="btn btn-primary"
+                      style={{ width: '100%' }}
+                    >
+                      + Register New Employee
+                    </button>
                   </div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                    Inserts an employee record into Oracle with department foreign key binding.
-                  </p>
-                  <button
-                    onClick={() => setIsEmpModalOpen(true)}
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                  >
-                    + Register New Employee
-                  </button>
-                </div>
+                ) : (
+                  <div className="card" style={{ padding: '18px', background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '14px' }}>👁️</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
+                        Read-Only Directory
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                      Technicians have read-only visibility into staff contacts. Administrative privileges required to register or modify personnel.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Right Column: Personnel Registry Table */}
@@ -1314,7 +1664,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
             <form onSubmit={handleSubmitTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Requester (Live from EMPLOYEES)
+                  Requester (Choose who you are)
                 </label>
                 <select
                   value={formData.user_id}
@@ -1323,10 +1673,13 @@ HAVING COUNT(e.employee_id) >= 2;`}
                 >
                   {availableUsers.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name} ({u.dept})
+                      {u.name} ({u.dept}) — ID #{u.id}
                     </option>
                   ))}
                 </select>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  Select your employee identity from the corporate directory.
+                </div>
               </div>
 
               <div>
@@ -1410,7 +1763,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
             <form onSubmit={handleResolveTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Assigned Technician (Live from EMPLOYEES)
+                  Resolving Engineer (Choose who you are)
                 </label>
                 <select
                   value={resolveData.technician_id}
@@ -1419,10 +1772,13 @@ HAVING COUNT(e.employee_id) >= 2;`}
                 >
                   {availableTechnicians.map((tech) => (
                     <option key={tech.id} value={tech.id}>
-                      {tech.name} ({tech.dept})
+                      {tech.name} ({tech.dept}) — ID #{tech.id}
                     </option>
                   ))}
                 </select>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                  Select your technician identity to record this resolution in Oracle.
+                </div>
               </div>
 
               <div>
