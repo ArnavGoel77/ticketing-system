@@ -175,10 +175,10 @@ Review 1 evaluates foundational relational modeling, standard SQL (DDL, DML, sin
 - [x] Create `server/.env` with Oracle Cloud database credentials (`DB_USER=ADMIN`, `DB_PASSWORD=...`, `DB_CONNECT_STRING=ticketdb_high`).
 
 #### 🔹 Shobit's Backend & Frontend Tasks:
-- [ ] Implement `GET /api/departments` in `server/server.js`.
-- [ ] Implement `GET /api/employees` (supports `?role=USER` and `?role=TECHNICIAN`).
-- [ ] Implement `POST /api/employees` (creates employee record).
-- [ ] In `client/`: Build dropdown components populated dynamically from `/api/employees?role=USER` (so the user can select their name rather than typing raw numeric IDs).
+- [x] Implement `GET /api/departments` in `server/server.js`.
+- [x] Implement `GET /api/employees` (supports `?role=USER` and `?role=TECHNICIAN`).
+- [x] Implement `POST /api/employees` (creates employee record).
+- [x] In `client/`: Build dropdown components populated dynamically from `/api/employees?role=USER` (so the user can select their name rather than typing raw numeric IDs).
 
 #### 🔹 Arnav's Backend & Frontend Tasks:
 - [x] Implement `GET /api/tickets` (fetches all active tickets joined with employee name and priority).

@@ -4,6 +4,8 @@ require('dotenv').config();
 
 const { initializePool, closePool } = require('./db');
 const ticketRoutes = require('./routes/tickets');
+const departmentRoutes = require('./routes/departments');
+const employeeRoutes = require('./routes/employees');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,7 +30,9 @@ app.get('/api/health', (req, res) => {
 // Arnav's Module: Ticket Management
 app.use('/api/tickets', ticketRoutes);
 
-// TODO (Shobit): Add Identity & Organization routes (/api/departments, /api/employees)
+// Shobit's Module: Identity & Organization
+app.use('/api/departments', departmentRoutes);
+app.use('/api/employees', employeeRoutes);
 
 
 // ============================================================================
@@ -44,7 +48,7 @@ const startServer = async () => {
 
     const server = app.listen(PORT, () => {
         console.log(`🚀 [Server] Running on http://localhost:${PORT}`);
-        console.log(`📡 [API Endpoints] /api/tickets, /api/tickets/metrics, /api/health`);
+        console.log(`📡 [API Endpoints] /api/tickets, /api/departments, /api/employees, /api/health`);
     });
 
     // Graceful shutdown handling
