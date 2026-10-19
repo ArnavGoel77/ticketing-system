@@ -170,9 +170,9 @@ Review 1 evaluates foundational relational modeling, standard SQL (DDL, DML, sin
 ### 1.5 Application Bridge & Presentation (Full-Stack Setup)
 
 #### 🔹 Shared / Setup Tasks:
-- [ ] Extract `Wallet_ticketdb.zip` into `server/wallet/`.
-- [ ] Create `server/db.js` using `node-oracledb` connection pool pointing to `ticketdb_high`.
-- [ ] Create `server/.env` with Oracle Cloud database credentials (`DB_USER=ADMIN`, `DB_PASSWORD=...`, `DB_CONNECT_STRING=ticketdb_high`).
+- [x] Extract `Wallet_ticketdb.zip` into `server/wallet/`.
+- [x] Create `server/db.js` using `node-oracledb` connection pool pointing to `ticketdb_high`.
+- [x] Create `server/.env` with Oracle Cloud database credentials (`DB_USER=ADMIN`, `DB_PASSWORD=...`, `DB_CONNECT_STRING=ticketdb_high`).
 
 #### 🔹 Shobit's Backend & Frontend Tasks:
 - [ ] Implement `GET /api/departments` in `server/server.js`.
@@ -181,14 +181,14 @@ Review 1 evaluates foundational relational modeling, standard SQL (DDL, DML, sin
 - [ ] In `client/`: Build dropdown components populated dynamically from `/api/employees?role=USER` (so the user can select their name rather than typing raw numeric IDs).
 
 #### 🔹 Arnav's Backend & Frontend Tasks:
-- [ ] Implement `GET /api/tickets` (fetches all active tickets joined with employee name and priority).
-- [ ] Implement `GET /api/tickets/:id` (fetches ticket with resolution details).
-- [ ] Implement `POST /api/tickets` (creates new ticket from form input).
-- [ ] Implement `PUT /api/tickets/:id` (updates ticket status or priority level).
-- [ ] Implement `DELETE /api/tickets/:id` (deletes/cancels open ticket).
-- [ ] Implement `POST /api/tickets/:id/resolve` (inserts resolution record and closes ticket).
-- [ ] Implement `GET /api/tickets/metrics` (executes the aggregate `GROUP BY` query for dashboard KPI cards).
-- [ ] In `client/src/App.jsx`:
+- [x] Implement `GET /api/tickets` (fetches all active tickets joined with employee name and priority).
+- [x] Implement `GET /api/tickets/:id` (fetches ticket with resolution details).
+- [x] Implement `POST /api/tickets` (creates new ticket from form input).
+- [x] Implement `PUT /api/tickets/:id` (updates ticket status or priority level).
+- [x] Implement `DELETE /api/tickets/:id` (deletes/cancels open ticket).
+- [x] Implement `POST /api/tickets/:id/resolve` (inserts resolution record and closes ticket).
+- [x] Implement `GET /api/tickets/metrics` (executes the aggregate `GROUP BY` query for dashboard KPI cards).
+- [x] In `client/src/App.jsx`:
   - **Summary Metrics Row:** KPI cards for Total Tickets, Open Issues, Critical Count, and Resolved Count.
   - **New Ticket Submission Form:** Category, priority dropdown, description, submit button.
   - **Active Incidents Data Grid:** Interactive table with color-coded status badges, inline status toggle, and delete action.
