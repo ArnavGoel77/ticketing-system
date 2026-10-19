@@ -201,7 +201,7 @@ export default function App() {
   });
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 20px', width: '100%' }}>
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px', width: '100%' }}>
       {/* Toast Notification */}
       {notification && (
         <div
@@ -210,28 +210,30 @@ export default function App() {
             top: '20px',
             right: '20px',
             zIndex: 1000,
-            padding: '12px 20px',
-            borderRadius: '8px',
-            background: notification.type === 'danger' ? '#ef4444' : '#10b981',
-            color: 'white',
-            fontWeight: 600,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            padding: '10px 16px',
+            borderRadius: '6px',
+            background: notification.type === 'danger' ? '#2b1517' : '#102419',
+            border: notification.type === 'danger' ? '1px solid #4d1c20' : '1px solid #1a4d2e',
+            color: notification.type === 'danger' ? '#f85149' : '#3fb950',
+            fontSize: '13px',
+            fontWeight: 500,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '8px',
           }}
         >
-          <span>{notification.type === 'danger' ? '⚠️' : '✅'}</span>
+          <span>{notification.type === 'danger' ? '•' : '✓'}</span>
           <span>{notification.message}</span>
         </div>
       )}
 
       {/* Top Navbar Header */}
       <header
-        className="glass-panel"
+        className="card"
         style={{
-          padding: '18px 24px',
-          marginBottom: '24px',
+          padding: '16px 20px',
+          marginBottom: '20px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -239,27 +241,33 @@ export default function App() {
           gap: '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, #6366f1, #3b82f6)',
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              background: '#1f2937',
+              border: '1px solid #374151',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '20px',
+              color: '#60a5fa',
             }}
           >
-            🎫
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+              <line x1="6" y1="6" x2="6.01" y2="6"></line>
+              <line x1="6" y1="18" x2="6.01" y2="18"></line>
+            </svg>
           </div>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: '#f8fafc', letterSpacing: '-0.02em' }}>
-              IT Service Desk Incident Command
+            <h1 style={{ fontSize: '18px', fontWeight: 600, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              IT Service Desk &bull; Incident Command
             </h1>
-            <p style={{ fontSize: '12px', color: '#94a3b8', margin: 0 }}>
-              DBMS Lab &bull; Vellore Institute of Technology &bull; <strong>Arnav's Module (Ticket Management)</strong>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+              Autonomous Database 26ai (mTLS) &bull; Arnav's Module (Ticket Management)
             </p>
           </div>
         </div>
@@ -270,29 +278,28 @@ export default function App() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '6px 12px',
-              background: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '20px',
+              padding: '4px 10px',
+              background: '#102419',
+              border: '1px solid #1a4d2e',
+              borderRadius: '4px',
               fontSize: '12px',
-              fontWeight: 600,
-              color: '#34d399',
+              fontWeight: 500,
+              color: '#3fb950',
             }}
           >
             <span
               style={{
-                width: '8px',
-                height: '8px',
+                width: '6px',
+                height: '6px',
                 borderRadius: '50%',
-                background: '#10b981',
-                boxShadow: '0 0 8px #10b981',
+                background: '#3fb950',
               }}
             />
-            Oracle Autonomous DB 26ai (mTLS)
+            Database Connected
           </div>
 
-          <button onClick={fetchData} className="btn btn-secondary" title="Refresh Live Data">
-            🔄 Refresh
+          <button onClick={fetchData} className="btn btn-secondary btn-xs" title="Refresh Live Data">
+            Refresh Data
           </button>
         </div>
       </header>
@@ -301,76 +308,76 @@ export default function App() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-          gap: '16px',
-          marginBottom: '24px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: '14px',
+          marginBottom: '20px',
         }}
       >
-        <div className="glass-panel" style={{ padding: '20px' }}>
-          <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>
+        <div className="card" style={{ padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
             Total Incidents
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#f8fafc', marginTop: '6px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
             {metrics?.totalTickets ?? tickets.length}
           </div>
-          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Recorded in `TICKETS` table</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Table: TICKETS</div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
-          <div style={{ fontSize: '12px', color: '#60a5fa', fontWeight: 600, textTransform: 'uppercase' }}>
-            Active / Triage
+        <div className="card" style={{ padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: '#58a6ff', fontWeight: 500 }}>
+            Active / In-Queue
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#60a5fa', marginTop: '6px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 600, color: '#58a6ff', marginTop: '4px' }}>
             {metrics?.openTickets ?? 0}
           </div>
-          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Status: OPEN or IN_PROGRESS</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Status: OPEN / IN_PROGRESS</div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', borderColor: 'rgba(239, 68, 68, 0.35)' }}>
-          <div style={{ fontSize: '12px', color: '#f87171', fontWeight: 600, textTransform: 'uppercase' }}>
-            Critical Priority
+        <div className="card" style={{ padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: '#f85149', fontWeight: 500 }}>
+            Critical Attention
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#f87171', marginTop: '6px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 600, color: '#f85149', marginTop: '4px' }}>
             {metrics?.criticalTickets ?? 0}
           </div>
-          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Immediate SLA attention required</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Immediate SLA response</div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
-          <div style={{ fontSize: '12px', color: '#34d399', fontWeight: 600, textTransform: 'uppercase' }}>
+        <div className="card" style={{ padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: '#3fb950', fontWeight: 500 }}>
             Resolved Tickets
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#34d399', marginTop: '6px' }}>
+          <div style={{ fontSize: '26px', fontWeight: 600, color: '#3fb950', marginTop: '4px' }}>
             {metrics?.resolvedTickets ?? 0}
           </div>
-          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Linked in `TICKET_RESOLUTIONS`</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Table: TICKET_RESOLUTIONS</div>
         </div>
 
-        <div className="glass-panel" style={{ padding: '20px', borderColor: 'rgba(6, 182, 212, 0.3)' }}>
-          <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 600, textTransform: 'uppercase' }}>
-            Avg Resolution Time
+        <div className="card" style={{ padding: '16px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+            Avg Turnaround Time
           </div>
-          <div style={{ fontSize: '32px', fontWeight: 800, color: '#38bdf8', marginTop: '6px' }}>
-            {metrics?.avgTurnaroundHours ? `${metrics.avgTurnaroundHours}h` : '18.4h'}
+          <div style={{ fontSize: '26px', fontWeight: 600, color: 'var(--text-primary)', marginTop: '4px' }}>
+            {metrics?.avgTurnaroundHours ? `${metrics.avgTurnaroundHours}h` : '4.25h'}
           </div>
-          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Computed via SQL AVG function</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>SQL AVG Function</div>
         </div>
       </div>
 
       {/* Main Grid: Form + Table */}
-      <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: '24px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '20px', alignItems: 'start' }}>
         {/* Left Column: Ticket Submission & Analytical Query Box */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* New Ticket Form */}
-          <div className="glass-panel" style={{ padding: '22px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 700, color: '#f8fafc', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>➕</span> Log New Incident
+          <div className="card" style={{ padding: '18px' }}>
+            <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px' }}>
+              Create Incident Ticket
             </h2>
 
-            <form onSubmit={handleSubmitTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleSubmitTicket} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
-                  Requester (User ID)
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  Requester
                 </label>
                 <select
                   value={formData.user_id}
@@ -379,15 +386,15 @@ export default function App() {
                 >
                   {USERS.map((u) => (
                     <option key={u.id} value={u.id}>
-                      #{u.id} - {u.name}
+                      #{u.id} &bull; {u.name}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
-                  Incident Category
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  Category
                 </label>
                 <select
                   value={formData.issue_category}
@@ -403,10 +410,10 @@ export default function App() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
                   Priority Level
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
                   {PRIORITIES.map((p) => {
                     const isSelected = formData.priority_level === p;
                     return (
@@ -415,13 +422,13 @@ export default function App() {
                         key={p}
                         onClick={() => setFormData({ ...formData, priority_level: p })}
                         style={{
-                          padding: '8px 10px',
-                          borderRadius: '6px',
-                          border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
-                          background: isSelected ? 'rgba(99, 102, 241, 0.2)' : 'rgba(15, 23, 42, 0.4)',
-                          color: isSelected ? '#a5b4fc' : '#94a3b8',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          border: isSelected ? '1px solid #3b82f6' : '1px solid var(--border-medium)',
+                          background: isSelected ? '#1c2638' : 'var(--bg-subtle)',
+                          color: isSelected ? '#58a6ff' : 'var(--text-secondary)',
                           fontSize: '11px',
-                          fontWeight: 700,
+                          fontWeight: 600,
                           cursor: 'pointer',
                         }}
                       >
@@ -436,26 +443,25 @@ export default function App() {
                 type="submit"
                 disabled={submitting}
                 className="btn btn-primary"
-                style={{ width: '100%', marginTop: '6px', padding: '12px' }}
+                style={{ width: '100%', marginTop: '4px' }}
               >
-                {submitting ? 'Writing to Oracle...' : '⚡ Insert Incident into TICKETS'}
+                {submitting ? 'Inserting...' : 'Submit Ticket'}
               </button>
             </form>
           </div>
 
           {/* Review 1 Analytical Query Card (Query 2.1 Live Display) */}
-          <div className="glass-panel" style={{ padding: '20px', background: 'rgba(15, 23, 42, 0.85)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <span style={{ fontSize: '14px' }}>📊</span>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Review 1 Query: Priority Queue
-              </span>
+          <div className="card" style={{ padding: '16px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+              Review 1 SQL Query &bull; Priority Queue
             </div>
-            <p style={{ fontSize: '11px', color: '#64748b', fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '8px', borderRadius: '6px', marginBottom: '12px' }}>
-              SELECT priority_level, COUNT(*)<br />
-              FROM TICKETS WHERE status IN ('OPEN', 'IN_PROGRESS')<br />
-              GROUP BY priority_level HAVING COUNT(*) &gt;= 2;
-            </p>
+            <pre style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)', padding: '8px', borderRadius: '4px', marginBottom: '12px', overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+{`SELECT priority_level, COUNT(*)
+FROM TICKETS
+WHERE status IN ('OPEN', 'IN_PROGRESS')
+GROUP BY priority_level
+HAVING COUNT(*) >= 2;`}
+            </pre>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {metrics?.byPriority && metrics.byPriority.length > 0 ? (
@@ -466,29 +472,30 @@ export default function App() {
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      padding: '6px 10px',
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      borderRadius: '6px',
+                      padding: '6px 8px',
+                      background: 'var(--bg-subtle)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: '4px',
                       fontSize: '12px',
                     }}
                   >
                     <span className={`badge badge-${(row.PRIORITY_LEVEL || row.priority_level || '').toLowerCase()}`}>
                       {row.PRIORITY_LEVEL || row.priority_level}
                     </span>
-                    <strong style={{ color: '#f8fafc' }}>
-                      {row.TOTAL_TICKETS_IN_QUEUE || row.total_tickets_in_queue} tickets
-                    </strong>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500, fontSize: '12px' }}>
+                      {row.TOTAL_TICKETS_IN_QUEUE || row.total_tickets_in_queue} in queue
+                    </span>
                   </div>
                 ))
               ) : (
-                <div style={{ fontSize: '12px', color: '#94a3b8' }}>No queues meeting HAVING &gt;= 2 threshold</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No queues meet HAVING &gt;= 2 threshold</div>
               )}
             </div>
           </div>
         </div>
 
         {/* Right Column: Live Data Grid */}
-        <div className="glass-panel" style={{ padding: '22px', overflow: 'hidden' }}>
+        <div className="card" style={{ padding: '18px', overflow: 'hidden' }}>
           {/* Table Toolbar */}
           <div
             style={{
@@ -496,33 +503,33 @@ export default function App() {
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: '14px',
-              marginBottom: '20px',
+              gap: '12px',
+              marginBottom: '16px',
             }}
           >
             <div>
-              <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
-                Active Incident Registry
+              <h2 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Incident Registry
               </h2>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>
-                Displaying {filteredTickets.length} of {tickets.length} tickets from Oracle Cloud
+              <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                {filteredTickets.length} of {tickets.length} tickets recorded
               </span>
             </div>
 
             {/* Filters */}
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <input
                 type="text"
-                placeholder="Search ticket, reporter, category..."
+                placeholder="Search ticket, reporter..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                style={{ width: '220px', padding: '6px 12px', fontSize: '12px' }}
+                style={{ width: '200px', padding: '6px 10px', fontSize: '12px' }}
               />
 
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ width: '130px', padding: '6px 10px', fontSize: '12px' }}
+                style={{ width: '120px', padding: '6px 8px', fontSize: '12px' }}
               >
                 <option value="ALL">All Statuses</option>
                 <option value="OPEN">OPEN</option>
@@ -534,7 +541,7 @@ export default function App() {
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-                style={{ width: '130px', padding: '6px 10px', fontSize: '12px' }}
+                style={{ width: '120px', padding: '6px 8px', fontSize: '12px' }}
               >
                 <option value="ALL">All Priorities</option>
                 <option value="CRITICAL">CRITICAL</option>
@@ -547,45 +554,40 @@ export default function App() {
 
           {/* Incident Table */}
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-              <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔄</div>
-              <div>Querying Oracle Cloud Autonomous Database...</div>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '13px' }}>Querying Oracle Database...</div>
             </div>
           ) : error ? (
             <div
               style={{
-                padding: '24px',
-                background: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                borderRadius: '8px',
-                color: '#f87171',
+                padding: '16px',
+                background: '#2b1517',
+                border: '1px solid #4d1c20',
+                borderRadius: '6px',
+                color: '#f85149',
                 textAlign: 'center',
               }}
             >
-              <div style={{ fontSize: '20px', marginBottom: '6px' }}>⚠️ Database Connection Note</div>
-              <div style={{ fontSize: '13px' }}>{error}</div>
-              <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '10px' }}>
-                Ensure your credentials are set in <code>server/.env</code> and that Phase 2 scripts have been executed on Oracle Cloud.
-              </p>
+              <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '4px' }}>Database Connection Notice</div>
+              <div style={{ fontSize: '12px' }}>{error}</div>
             </div>
           ) : filteredTickets.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748b' }}>
-              <div style={{ fontSize: '24px', marginBottom: '6px' }}>📭</div>
-              <div>No tickets match your search filters</div>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+              No tickets found matching the specified filters.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: '#94a3b8' }}>
-                    <th style={{ padding: '10px 12px' }}>ID</th>
-                    <th style={{ padding: '10px 12px' }}>Reporter</th>
-                    <th style={{ padding: '10px 12px' }}>Category</th>
-                    <th style={{ padding: '10px 12px' }}>Priority</th>
-                    <th style={{ padding: '10px 12px' }}>Status</th>
-                    <th style={{ padding: '10px 12px' }}>Submitted</th>
-                    <th style={{ padding: '10px 12px' }}>Resolution Notes</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Actions</th>
+                  <tr style={{ borderBottom: '1px solid var(--border-medium)', background: 'var(--bg-subtle)', color: 'var(--text-secondary)' }}>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>ID</th>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Requester</th>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Category</th>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Priority</th>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Status</th>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Submitted</th>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Resolution Notes</th>
+                    <th style={{ padding: '8px 10px', fontWeight: 600, fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.03em', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -602,34 +604,33 @@ export default function App() {
                       <tr
                         key={ticketId}
                         style={{
-                          borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                          transition: 'background 0.15s ease',
+                          borderBottom: '1px solid var(--border-subtle)',
                         }}
                       >
-                        <td style={{ padding: '12px', fontWeight: 700, color: '#a5b4fc', fontFamily: 'monospace' }}>
+                        <td style={{ padding: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', fontSize: '12px' }}>
                           #{ticketId}
                         </td>
-                        <td style={{ padding: '12px' }}>
-                          <div style={{ fontWeight: 600, color: '#f8fafc' }}>{reporterName}</div>
-                          <div style={{ fontSize: '11px', color: '#64748b' }}>User #{t.USER_ID || t.user_id}</div>
+                        <td style={{ padding: '10px' }}>
+                          <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{reporterName}</div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>ID #{t.USER_ID || t.user_id}</div>
                         </td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{ color: '#cbd5e1', fontWeight: 500 }}>{category}</span>
+                        <td style={{ padding: '10px' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>{category}</span>
                         </td>
-                        <td style={{ padding: '12px' }}>
+                        <td style={{ padding: '10px' }}>
                           <span className={`badge badge-${priority.toLowerCase()}`}>{priority}</span>
                         </td>
-                        <td style={{ padding: '12px' }}>
+                        <td style={{ padding: '10px' }}>
                           <span className={`badge status-${status.toLowerCase()}`}>{status}</span>
                         </td>
-                        <td style={{ padding: '12px', fontSize: '11.5px', color: '#94a3b8' }}>
+                        <td style={{ padding: '10px', fontSize: '11.5px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
                           {createdDate}
                         </td>
-                        <td style={{ padding: '12px', maxWidth: '240px' }}>
+                        <td style={{ padding: '10px', maxWidth: '220px' }}>
                           <div
                             style={{
                               fontSize: '12px',
-                              color: status === 'RESOLVED' ? '#34d399' : '#64748b',
+                              color: status === 'RESOLVED' ? '#3fb950' : 'var(--text-tertiary)',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
@@ -639,12 +640,12 @@ export default function App() {
                             {notes}
                           </div>
                           {t.TECHNICIAN_NAME && (
-                            <div style={{ fontSize: '11px', color: '#38bdf8', marginTop: '2px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                               Tech: {t.TECHNICIAN_NAME}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <td style={{ padding: '10px', textAlign: 'right' }}>
                           <div style={{ display: 'inline-flex', gap: '6px' }}>
                             {status === 'OPEN' && (
                               <button
@@ -669,7 +670,7 @@ export default function App() {
                               className="btn btn-danger btn-xs"
                               title="Delete Ticket"
                             >
-                              🗑️
+                              Delete
                             </button>
                           </div>
                         </td>
@@ -686,18 +687,18 @@ export default function App() {
       {/* Resolution Modal */}
       {resolvingTicket && (
         <div className="modal-overlay">
-          <div className="glass-panel" style={{ width: '480px', padding: '24px', background: '#111827' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc', marginBottom: '8px' }}>
+          <div className="card" style={{ width: '480px', padding: '20px', background: 'var(--bg-surface-elevated)' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
               Resolve Incident #{resolvingTicket.TICKET_ID || resolvingTicket.ticket_id}
             </h2>
-            <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '18px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
               Category: <strong>{resolvingTicket.ISSUE_CATEGORY || resolvingTicket.issue_category}</strong> &bull; Priority:{' '}
               <strong>{resolvingTicket.PRIORITY_LEVEL || resolvingTicket.priority_level}</strong>
             </p>
 
-            <form onSubmit={handleResolveTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleResolveTicket} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
                   Resolving Technician
                 </label>
                 <select
@@ -707,35 +708,35 @@ export default function App() {
                 >
                   {TECHNICIANS.map((tech) => (
                     <option key={tech.id} value={tech.id}>
-                      #{tech.id} - {tech.name}
+                      #{tech.id} &bull; {tech.name}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
-                  Technical Work Notes & Actions Taken (NOT NULL)
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  Technical Resolution Notes (NOT NULL)
                 </label>
                 <textarea
                   rows={4}
-                  placeholder="Detail the technical steps performed to resolve this incident..."
+                  placeholder="Detail the technical steps taken to resolve this incident..."
                   value={resolveData.resolution_notes}
                   onChange={(e) => setResolveData({ ...resolveData, resolution_notes: e.target.value })}
                   required
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '6px' }}>
                 <button
                   type="button"
                   onClick={() => setResolvingTicket(null)}
-                  className="btn btn-secondary"
+                  className="btn btn-secondary btn-xs"
                 >
                   Cancel
                 </button>
-                <button type="submit" disabled={resolving} className="btn btn-primary">
-                  {resolving ? 'Submitting to Oracle...' : 'Commit Resolution'}
+                <button type="submit" disabled={resolving} className="btn btn-primary btn-xs">
+                  {resolving ? 'Submitting...' : 'Commit Resolution'}
                 </button>
               </div>
             </form>
