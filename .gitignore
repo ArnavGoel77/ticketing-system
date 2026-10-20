@@ -47,3 +47,13 @@ Thumbs.db
 *.sw?
 .vscode/*
 !.vscode/extensions.json
+
+# Internal rules & task documentation
+rules.md
+*tasks*.md
+*TASKS*.md
+.agents/
+.agents
+
+
+
