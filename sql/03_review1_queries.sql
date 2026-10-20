@@ -1,19 +1,4 @@
--- ============================================================================
--- DBMS Lab Project: IT Service Desk Incident & Ticketing System
--- Review 1: 03_review1_queries.sql (ARNAV'S MODULE: Analytical SQL Queries)
--- Database Engine: Oracle Autonomous Database 26ai / 19c
--- ============================================================================
--- Academic Focus (Ticket Management Module):
---   1. Single-Row Functions: Date/Time (TO_CHAR), Character (UPPER), NULL Handling (NVL), Numeric (ROUND)
---   2. Group & Aggregate Functions: COUNT, AVG, MIN, MAX, GROUP BY, HAVING
--- ============================================================================
-
--- ============================================================================
--- PART 1: SINGLE-ROW FUNCTIONS (Arnav's Scope)
--- ============================================================================
-
--- Query 1.1: Date & Timestamp Formatting (TO_CHAR)
--- Purpose: Convert raw Oracle timestamps into human-readable corporate date/time formats
+-- Format timestamps and uppercase categories using TO_CHAR and UPPER
 SELECT 
     ticket_id,
     UPPER(issue_category) AS standardized_category,
@@ -23,9 +8,7 @@ SELECT
 FROM TICKETS
 ORDER BY created_at DESC;
 
-
--- Query 1.2: NULL Value Handling via NVL() & Outer Join
--- Purpose: Join tickets with resolutions and replace NULL notes for unresolved tickets
+-- Handle NULL resolution notes on unresolved tickets using NVL and LEFT JOIN
 SELECT 
     t.ticket_id,
     t.issue_category,
@@ -37,9 +20,7 @@ FROM TICKETS t
 LEFT OUTER JOIN TICKET_RESOLUTIONS r ON t.ticket_id = r.ticket_id
 ORDER BY t.ticket_id;
 
-
--- Query 1.3: Numeric / Math Single-Row Function (ROUND & Date Arithmetic)
--- Purpose: Compute resolution turnaround duration in hours rounded to 2 decimal places
+-- Calculate turnaround time in hours using ROUND and date subtraction
 SELECT 
     r.resolution_id,
     r.ticket_id,
@@ -49,13 +30,7 @@ FROM TICKET_RESOLUTIONS r
 JOIN TICKETS t ON r.ticket_id = t.ticket_id
 ORDER BY turnaround_hours DESC;
 
-
--- ============================================================================
--- PART 2: OPERATORS & GROUP (AGGREGATE) FUNCTIONS (Arnav's Scope)
--- ============================================================================
-
--- Query 2.1: Priority Queue Aggregation with HAVING Filter (Syllabus Core)
--- Purpose: Count active tickets grouped by priority level where open ticket volume is >= 2
+-- Count pending tickets grouped by priority level with HAVING count >= 2
 SELECT 
     priority_level,
     COUNT(*) AS total_tickets_in_queue
@@ -65,9 +40,7 @@ GROUP BY priority_level
 HAVING COUNT(*) >= 2
 ORDER BY total_tickets_in_queue DESC;
 
-
--- Query 2.2: Ticket Distribution by Operational Status
--- Purpose: Provide high-level volume metrics for dashboard KPI summary cards
+-- Compute ticket distribution and percentages by operational status
 SELECT 
     status,
     COUNT(*) AS count_by_status,
@@ -76,9 +49,7 @@ FROM TICKETS
 GROUP BY status
 ORDER BY count_by_status DESC;
 
-
--- Query 2.3: Incident Breakdown by Category
--- Purpose: Identify the most frequent technical problem areas across campus
+-- Group incident volume by issue category
 SELECT 
     issue_category,
     COUNT(*) AS incident_frequency
@@ -86,9 +57,7 @@ FROM TICKETS
 GROUP BY issue_category
 ORDER BY incident_frequency DESC;
 
-
--- Query 2.4: Average Resolution Turnaround Time (Aggregate AVG, MIN, MAX)
--- Purpose: Calculate overall average, fastest, and longest resolution times across completed incidents
+-- Calculate overall average, minimum, and maximum resolution turnaround hours
 SELECT 
     COUNT(*) AS resolved_incident_count,
     ROUND(AVG((CAST(r.resolved_at AS DATE) - CAST(t.created_at AS DATE)) * 24), 2) AS overall_avg_resolution_hours,
