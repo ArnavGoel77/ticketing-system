@@ -101,34 +101,34 @@ erDiagram
     EMPLOYEES ||--o{ TICKET_RESOLUTIONS : "resolves"
 
     DEPARTMENTS {
-        NUMBER department_id PK "Identity (1-5)"
-        VARCHAR2 department_name "NOT NULL"
-        VARCHAR2 location_building "Facility location"
+        number department_id PK
+        string department_name
+        string location_building
     }
 
     EMPLOYEES {
-        NUMBER employee_id PK "Identity (101-302)"
-        NUMBER department_id FK "REFERENCES DEPARTMENTS ON DELETE SET NULL"
-        VARCHAR2 full_name "NOT NULL"
-        VARCHAR2 email UK "NOT NULL, UNIQUE"
-        VARCHAR2 role "CHECK (USER, TECHNICIAN, ADMIN)"
+        number employee_id PK
+        number department_id FK
+        string full_name
+        string email UK
+        string role
     }
 
     TICKETS {
-        NUMBER ticket_id PK "Identity (1001-1008)"
-        NUMBER user_id FK "REFERENCES EMPLOYEES ON DELETE CASCADE"
-        VARCHAR2 issue_category "NETWORK, HARDWARE, SOFTWARE, etc."
-        VARCHAR2 priority_level "CHECK (LOW, MEDIUM, HIGH, CRITICAL)"
-        VARCHAR2 status "CHECK (OPEN, IN_PROGRESS, RESOLVED, CLOSED)"
-        TIMESTAMP created_at "DEFAULT CURRENT_TIMESTAMP"
+        number ticket_id PK
+        number user_id FK
+        string issue_category
+        string priority_level
+        string status
+        timestamp created_at
     }
 
     TICKET_RESOLUTIONS {
-        NUMBER resolution_id PK "Identity (5001-5004)"
-        NUMBER ticket_id UK_FK "UNIQUE REFERENCES TICKETS ON DELETE CASCADE"
-        NUMBER technician_id FK "REFERENCES EMPLOYEES"
-        VARCHAR2 resolution_notes "NOT NULL (Up to 1000 chars)"
-        TIMESTAMP resolved_at "DEFAULT CURRENT_TIMESTAMP"
+        number resolution_id PK
+        number ticket_id FK
+        number technician_id FK
+        string resolution_notes
+        timestamp resolved_at
     }
 ```
 
