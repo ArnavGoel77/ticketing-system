@@ -13,29 +13,29 @@
 -- ============================================================================
 
 -- 1.1 Insert 8 Realistic Incident Tickets
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1001, 101, 'NETWORK', 'CRITICAL', 'RESOLVED', SYSTIMESTAMP - INTERVAL '5' DAY);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1001, 101, 201, 'NETWORK', 'Core gateway switch port 24 failing under heavy traffic load. Intermittent packet drops affecting 3rd-floor workstations.', 'CRITICAL', 'RESOLVED', SYSTIMESTAMP - INTERVAL '5' DAY);
 
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1002, 102, 'HARDWARE', 'HIGH', 'RESOLVED', SYSTIMESTAMP - INTERVAL '4' DAY);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1002, 102, 202, 'HARDWARE', 'ThinkPad workstation experiencing severe thermal throttling and loud grinding noise from the cooling fan under moderate load.', 'HIGH', 'RESOLVED', SYSTIMESTAMP - INTERVAL '4' DAY);
 
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1003, 103, 'SOFTWARE', 'MEDIUM', 'RESOLVED', SYSTIMESTAMP - INTERVAL '3' DAY);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1003, 103, 203, 'SOFTWARE', 'Outlook desktop search catalog corrupted; cannot index or synchronize emails from the departmental exchange mailbox.', 'MEDIUM', 'RESOLVED', SYSTIMESTAMP - INTERVAL '3' DAY);
 
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1004, 104, 'ACCOUNT_ACCESS', 'CRITICAL', 'RESOLVED', SYSTIMESTAMP - INTERVAL '2' DAY);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1004, 104, 201, 'ACCOUNT_ACCESS', 'Active Directory profile locked out after consecutive VPN password attempts. Need emergency MFA credential reset.', 'CRITICAL', 'RESOLVED', SYSTIMESTAMP - INTERVAL '2' DAY);
 
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1005, 105, 'NETWORK', 'HIGH', 'IN_PROGRESS', SYSTIMESTAMP - INTERVAL '1' DAY);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1005, 105, 201, 'NETWORK', 'GlobalProtect SSL VPN disconnects abruptly every 15 minutes while working remotely over home broadband.', 'HIGH', 'IN_PROGRESS', SYSTIMESTAMP - INTERVAL '1' DAY);
 
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1006, 106, 'EMAIL', 'MEDIUM', 'OPEN', SYSTIMESTAMP - INTERVAL '14' HOUR);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1006, 106, NULL, 'EMAIL', 'Department shared inbox receiving automated bounce-backs from corporate anti-spam gateway filters.', 'MEDIUM', 'OPEN', SYSTIMESTAMP - INTERVAL '14' HOUR);
 
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1007, 101, 'SOFTWARE', 'CRITICAL', 'OPEN', SYSTIMESTAMP - INTERVAL '6' HOUR);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1007, 101, NULL, 'SOFTWARE', 'IDE enterprise license key activation rejected with error 403 on development testbed server.', 'CRITICAL', 'OPEN', SYSTIMESTAMP - INTERVAL '6' HOUR);
 
-INSERT INTO TICKETS (ticket_id, user_id, issue_category, priority_level, status, created_at)
-VALUES (1008, 103, 'HARDWARE', 'LOW', 'OPEN', SYSTIMESTAMP - INTERVAL '2' HOUR);
+INSERT INTO TICKETS (ticket_id, user_id, assigned_to, issue_category, issue_description, priority_level, status, created_at)
+VALUES (1008, 103, NULL, 'HARDWARE', 'Dual-monitor workstation displays black screen on second DisplayPort after graphic driver patch.', 'LOW', 'OPEN', SYSTIMESTAMP - INTERVAL '2' HOUR);
 
 
 -- 1.2 Insert 4 Incident Resolutions (1-to-1 links with resolved tickets)

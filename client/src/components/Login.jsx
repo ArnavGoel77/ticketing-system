@@ -279,7 +279,7 @@ export default function Login({ onLoginSuccess }) {
 
         <div style={{ textAlign: 'center', marginTop: '22px' }}>
           <p style={{ fontSize: '11.5px', color: '#94a3b8', margin: 0 }}>
-            Identity & Organization Module &bull; Shobit
+            Corporate IT Incident &amp; Personnel Management System
           </p>
         </div>
       </div>
