@@ -6,6 +6,7 @@ const { initializePool, closePool } = require('./db');
 const ticketRoutes = require('./routes/tickets');
 const departmentRoutes = require('./routes/departments');
 const employeeRoutes = require('./routes/employees');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -27,12 +28,13 @@ app.get('/api/health', (req, res) => {
 // ROUTE REGISTRATION
 // ============================================================================
 
-// Arnav's Module: Ticket Management
-app.use('/api/tickets', ticketRoutes);
-
-// Shobit's Module: Identity & Organization
+// Shobit's Module: Identity, Authentication & Organization
+app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/employees', employeeRoutes);
+
+// Arnav's Module: Ticket Management
+app.use('/api/tickets', ticketRoutes);
 
 
 // ============================================================================

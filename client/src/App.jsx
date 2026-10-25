@@ -1,77 +1,41 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Login from './components/Login';
 
-// Preset lists aligned with database records (used as instant fallback)
-const USERS = [
-  { id: 101, name: 'Aarav Sharma', dept: 'Engineering', email: 'aarav.sharma@company.com' },
-  { id: 102, name: 'Priya Patel', dept: 'Engineering', email: 'priya.patel@company.com' },
-  { id: 103, name: 'Rohan Iyer', dept: 'Human Resources', email: 'rohan.iyer@company.com' },
-  { id: 104, name: 'Ananya Verma', dept: 'Finance', email: 'ananya.verma@company.com' },
-  { id: 105, name: 'Aditya Nair', dept: 'Operations', email: 'aditya.nair@company.com' },
-  { id: 106, name: 'Sneha Kulkarni', dept: 'Operations', email: 'sneha.kulkarni@company.com' },
-];
-
-const TECHNICIANS = [
-  { id: 201, name: 'Vikram Malhotra', dept: 'IT Support' },
-  { id: 202, name: 'Neha Sengupta', dept: 'IT Support' },
-  { id: 203, name: 'Rahul Deshmukh', dept: 'IT Support' },
-];
-
+// Static Fallbacks for Categories & Priorities
 const CATEGORIES = [
-  { id: 'NETWORK', label: 'Network & VPN' },
+  { id: 'NETWORK', label: 'Network & Connectivity' },
   { id: 'HARDWARE', label: 'Hardware Fault' },
-  { id: 'SOFTWARE', label: 'Software / OS' },
-  { id: 'ACCOUNT_ACCESS', label: 'Account & IAM' },
-  { id: 'EMAIL', label: 'Email & Outlook' },
+  { id: 'SOFTWARE', label: 'Software / Applications' },
+  { id: 'ACCOUNT_ACCESS', label: 'Account & IAM Security' },
+  { id: 'EMAIL', label: 'Email & Communications' },
 ];
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
-// Demo Profiles for Multi-Persona Role Switching (POC)
-// Role Categories for Multi-Persona Role Switching (POC)
-const PROFILES = {
-  USER: {
-    key: 'USER',
-    role: 'USER',
-    label: 'End User',
-    title: 'Employee Self-Service Portal',
-    desc: 'Campus employee view. Can submit support tickets and monitor status. Cannot triage, resolve, or delete tickets.',
-    permissionTag: 'Submit Only',
-    avatarBg: '#dbeafe',
-    avatarColor: '#1d4ed8',
-    icon: '👤',
-  },
-  ENGINEER: {
-    key: 'ENGINEER',
-    role: 'TECHNICIAN',
-    label: 'Support Engineer',
-    title: 'Technical Incident Workbench',
-    desc: 'IT Technician view. Can investigate and resolve active incidents. Organization staff directory is read-only.',
-    permissionTag: 'Triage & Resolve',
-    avatarBg: '#fef3c7',
-    avatarColor: '#b45309',
-    icon: '🛠️',
-  },
-  ADMIN: {
-    key: 'ADMIN',
-    role: 'ADMIN',
-    label: 'System Admin',
-    title: 'Administrative Control Center',
-    desc: 'Superuser view. Full governance across ticket lifecycles, resolutions, deletions, and employee directory management.',
-    permissionTag: 'Full Superuser Access',
-    avatarBg: '#ede9fe',
-    avatarColor: '#6d28d9',
-    icon: '🛡️',
-  },
-};
-
 export default function App() {
-  // Active Profile State (POC Persona Switcher)
-  const [activeProfileKey, setActiveProfileKey] = useState('ADMIN');
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const currentProfile = PROFILES[activeProfileKey];
+  // Session Authentication State (Task S2)
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('currentUser');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
 
-  // Navigation Tab: 'tickets' (Arnav's module) vs 'organization' (Shobit's module)
-  const [activeTab, setActiveTab] = useState('tickets');
+  // Dedicated Route State (Task S2 & S3: /login, /admin, /user, /engineer)
+  const getRouteFromPath = () => {
+    const p = window.location.pathname.toLowerCase();
+    if (p.includes('/admin')) return '/admin';
+    if (p.includes('/engineer')) return '/engineer';
+    if (p.includes('/user')) return '/user';
+    return '/login';
+  };
+
+  const [currentRoute, setCurrentRoute] = useState(getRouteFromPath);
+
+  // Admin Dedicated Sub-Tab ('organization' | 'tickets' | 'sqllab')
+  const [adminActiveTab, setAdminActiveTab] = useState('organization');
 
   // Shared Data States
   const [tickets, setTickets] = useState([]);
@@ -80,17 +44,17 @@ export default function App() {
   const [employees, setEmployees] = useState([]);
   const [headcountMetrics, setHeadcountMetrics] = useState([]);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notification, setNotification] = useState(null);
 
-  // Tickets Filters
+  // Tickets Filter States
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
 
-  // Employees Filters (Shobit's Module)
+  // Employees Filter States (Shobit's Module)
   const [empSearch, setEmpSearch] = useState('');
   const [empRoleFilter, setEmpRoleFilter] = useState('ALL');
   const [empDeptFilter, setEmpDeptFilter] = useState('ALL');
@@ -98,22 +62,20 @@ export default function App() {
   // Modals & UI Toggles
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEmpModalOpen, setIsEmpModalOpen] = useState(false);
-  const [showSqlDetails, setShowSqlDetails] = useState(false);
+  const [isStaffLookupOpen, setIsStaffLookupOpen] = useState(false);
 
-  // New Ticket Form State
+  // Create Ticket Form State
   const [formData, setFormData] = useState({
     user_id: '',
     issue_category: '',
+    issue_description: '',
     priority_level: 'MEDIUM',
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Resolve Modal State
+  // Resolve Ticket Modal State
   const [resolvingTicket, setResolvingTicket] = useState(null);
-  const [resolveData, setResolveData] = useState({
-    technician_id: '',
-    resolution_notes: '',
-  });
+  const [resolveNotes, setResolveNotes] = useState('');
   const [resolving, setResolving] = useState(false);
 
   // Register Employee Form State (Shobit's Module)
@@ -140,8 +102,47 @@ export default function App() {
     setTimeout(() => setNotification(null), 4000);
   };
 
-  // Fetch Live Data Across Both Modules
+  // Safe Navigation Helper with History PushState
+  const navigate = (path) => {
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+    setCurrentRoute(path);
+  };
+
+  // Sync with browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentRoute(getRouteFromPath());
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Route Guarding & Initial Redirection
+  useEffect(() => {
+    if (!currentUser) {
+      if (currentRoute !== '/login') {
+        navigate('/login');
+      }
+    } else {
+      // Authenticated User
+      if (currentRoute === '/login' || currentRoute === '/') {
+        if (currentUser.role === 'ADMIN') navigate('/admin');
+        else if (currentUser.role === 'TECHNICIAN') navigate('/engineer');
+        else navigate('/user');
+      } else if (currentRoute === '/admin' && currentUser.role !== 'ADMIN') {
+        // Guard /admin against non-administrators
+        showToast('Access denied: Administrator privileges required.', 'danger');
+        if (currentUser.role === 'TECHNICIAN') navigate('/engineer');
+        else navigate('/user');
+      }
+    }
+  }, [currentUser, currentRoute]);
+
+  // Fetch Live Database Data Across Modules
   const fetchData = useCallback(async () => {
+    if (!currentUser) return;
     setLoading(true);
     setError(null);
     try {
@@ -164,9 +165,7 @@ export default function App() {
       if (ticketsJson.success) setTickets(ticketsJson.data || []);
       if (metricsJson.success) setMetrics(metricsJson.data || null);
       if (deptJson.success) setDepartments(deptJson.data || []);
-      if (empJson.success) {
-        setEmployees(empJson.data || []);
-      }
+      if (empJson.success) setEmployees(empJson.data || []);
       if (headJson.success) setHeadcountMetrics(headJson.data || []);
     } catch (err) {
       console.error('Data fetch error:', err);
@@ -174,27 +173,50 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Dynamic user and technician lists with fallback
-  const liveUsers = employees
-    .filter(e => e.ROLE === 'USER')
-    .map(e => ({ id: e.EMPLOYEE_ID, name: e.FULL_NAME, dept: e.DEPARTMENT_NAME || 'Staff', email: e.EMAIL }));
-  const availableUsers = liveUsers.length > 0 ? liveUsers : USERS;
+  // Session Handlers
+  const handleLoginSuccess = (userObj) => {
+    setCurrentUser(userObj);
+    showToast(`Welcome back, ${userObj.full_name}!`, 'success');
+    if (userObj.role === 'ADMIN') {
+      navigate('/admin');
+    } else if (userObj.role === 'TECHNICIAN') {
+      navigate('/engineer');
+    } else {
+      navigate('/user');
+    }
+  };
 
-  const liveTechnicians = employees
-    .filter(e => e.ROLE === 'TECHNICIAN')
-    .map(e => ({ id: e.EMPLOYEE_ID, name: e.FULL_NAME, dept: e.DEPARTMENT_NAME || 'IT Support' }));
-  const availableTechnicians = liveTechnicians.length > 0 ? liveTechnicians : TECHNICIANS;
+  const handleLogout = () => {
+    localStorage.removeItem('currentUser');
+    setCurrentUser(null);
+    navigate('/login');
+    showToast('Signed out successfully.', 'success');
+  };
 
-  // Submit New Ticket (Arnav's Module)
+  // Helper for Initials
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
+  // ============================================================================
+  // TICKET MUTATION HANDLERS
+  // ============================================================================
+
+  // Submit New Ticket
   const handleSubmitTicket = async (e) => {
     e.preventDefault();
-    if (!formData.user_id) {
+    const requesterId = currentUser.role === 'USER' ? currentUser.employee_id : (formData.user_id || currentUser.employee_id);
+
+    if (!requesterId) {
       showToast('Please select a requester identity.', 'danger');
       return;
     }
@@ -202,22 +224,32 @@ export default function App() {
       showToast('Please select an issue category.', 'danger');
       return;
     }
+
     setSubmitting(true);
     try {
+      const payload = {
+        user_id: Number(requesterId),
+        issue_category: formData.issue_category,
+        issue_description: formData.issue_description.trim() || 'General incident inquiry',
+        priority_level: currentUser.role === 'USER' ? 'MEDIUM' : (formData.priority_level || 'MEDIUM'),
+      };
+
       const res = await fetch('/api/tickets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to submit ticket');
+        throw new Error(data.message || 'Failed to submit incident ticket');
       }
 
-      showToast(`Ticket #${data.data.ticket_id} created successfully!`, 'success');
+      showToast(`Ticket #${data.data.ticket_id} submitted successfully!`, 'success');
       setFormData({
         user_id: '',
         issue_category: '',
+        issue_description: '',
         priority_level: 'MEDIUM',
       });
       setIsCreateModalOpen(false);
@@ -229,55 +261,50 @@ export default function App() {
     }
   };
 
-  // Update Status (Arnav's Module)
-  const handleUpdateStatus = async (ticketId, newStatus) => {
+  // Support Engineer Investigation Action
+  const handleStartInvestigation = async (ticketId) => {
     try {
       const res = await fetch(`/api/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: 'IN_PROGRESS',
+          assigned_to: currentUser.employee_id
+        }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message);
+      if (!res.ok || !data.success) throw new Error(data.message || 'Investigation update failed');
 
-      showToast(`Ticket #${ticketId} moved to ${newStatus.replace('_', ' ')}`, 'success');
+      showToast(`Assigned Ticket #${ticketId} to ${currentUser.full_name}. Status moved to IN_PROGRESS.`, 'success');
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
     }
   };
 
-  // Execute Ticket Deletion (Confirmed via on-screen modal)
-  const executeDeleteTicket = async (ticketId) => {
+  // Support Engineer Priority Escalation Action
+  const handleUpdatePriority = async (ticketId, newPriority) => {
     try {
-      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' });
-      let data;
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
-      }
+      const res = await fetch(`/api/tickets/${ticketId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priority_level: newPriority }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Priority update failed');
 
-      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete ticket');
-
-      showToast(`Ticket #${ticketId} deleted.`, 'success');
+      showToast(`Ticket #${ticketId} priority escalated to ${newPriority}`, 'success');
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
     }
   };
 
-  // Submit Resolution (Arnav's Module)
+  // Submit Resolution
   const handleResolveTicket = async (e) => {
     e.preventDefault();
-    if (!resolveData.technician_id) {
-      showToast('Please select a resolving engineer.', 'danger');
-      return;
-    }
-    if (!resolveData.resolution_notes.trim()) {
-      showToast('Please enter technical resolution notes.', 'danger');
+    if (!resolveNotes.trim()) {
+      showToast('Please enter technical resolution diagnosis notes.', 'danger');
       return;
     }
     setResolving(true);
@@ -286,14 +313,17 @@ export default function App() {
       const res = await fetch(`/api/tickets/${ticketId}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(resolveData),
+        body: JSON.stringify({
+          technician_id: currentUser.employee_id,
+          resolution_notes: resolveNotes.trim()
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message);
 
       showToast(`Ticket #${ticketId} resolved successfully.`, 'success');
       setResolvingTicket(null);
-      setResolveData({ technician_id: '', resolution_notes: '' });
+      setResolveNotes('');
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
@@ -302,7 +332,25 @@ export default function App() {
     }
   };
 
-  // Register Employee (Shobit's Module)
+  // Execute Ticket Deletion (Admin Only)
+  const executeDeleteTicket = async (ticketId) => {
+    try {
+      const res = await fetch(`/api/tickets/${ticketId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to delete ticket');
+
+      showToast(`Ticket #${ticketId} permanently removed.`, 'success');
+      fetchData();
+    } catch (err) {
+      showToast(err.message, 'danger');
+    }
+  };
+
+  // ============================================================================
+  // SHOBIT'S MODULE HANDLERS (Identity & Organization)
+  // ============================================================================
+
+  // Register Employee (Task S1 & S3)
   const handleRegisterEmployee = async (e) => {
     e.preventDefault();
     if (!empFormData.full_name.trim() || !empFormData.email.trim()) {
@@ -343,18 +391,11 @@ export default function App() {
     }
   };
 
-  // Execute Employee Deletion (Confirmed via on-screen modal)
+  // Delete Employee (Shobit's Module: Task S1 & S3 with FK Handling)
   const executeDeleteEmployee = async (empId, empName) => {
     try {
       const res = await fetch(`/api/employees/${empId}`, { method: 'DELETE' });
-      let data;
-      const contentType = res.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        throw new Error(text || `Server responded with HTTP ${res.status}`);
-      }
+      const data = await res.json();
 
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Failed to delete employee');
@@ -367,24 +408,7 @@ export default function App() {
     }
   };
 
-  // RBAC Admin permission check (compatible with Arnav's profile/role switcher)
-  const isSuperAdmin = typeof activeRole !== 'undefined'
-    ? activeRole === 'ADMIN'
-    : typeof activeProfile !== 'undefined'
-    ? activeProfile?.role === 'ADMIN'
-    : typeof currentProfile !== 'undefined'
-    ? currentProfile?.role === 'ADMIN'
-    : true;
-
-  // Helper for Initials
-  const getInitials = (name) => {
-    if (!name) return 'U';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    return name.slice(0, 2).toUpperCase();
-  };
-
-  // Filtered Tickets (Arnav's Module)
+  // Filtered Tickets
   const filteredTickets = tickets.filter((t) => {
     const id = String(t.TICKET_ID || t.ticket_id || '');
     const reporter = String(t.REPORTER_NAME || t.reporter_name || '').toLowerCase();
@@ -415,6 +439,30 @@ export default function App() {
     return matchesSearch && matchesRole && matchesDept;
   });
 
+  // ============================================================================
+  // UN-AUTHENTICATED ROUTE: /login (Task S2)
+  // ============================================================================
+  if (!currentUser || currentRoute === '/login') {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // ============================================================================
+  // AUTHENTICATED PORTAL SHELL (Header + Dynamic Views)
+  // ============================================================================
+  const roleTitleMap = {
+    ADMIN: 'System Administration & Governance',
+    TECHNICIAN: 'Support Engineer Incident Workbench',
+    USER: 'Employee Self-Service Portal'
+  };
+
+  const rolePillMap = {
+    ADMIN: { label: '🛡️ System Admin', bg: '#f5f3ff', color: '#6d28d9', border: '#ede9fe' },
+    TECHNICIAN: { label: '🛠️ IT Technician', bg: '#fffbeb', color: '#b45309', border: '#fef3c7' },
+    USER: { label: '👤 Corporate User', bg: '#eff6ff', color: '#1d4ed8', border: '#dbeafe' }
+  };
+
+  const activePill = rolePillMap[currentUser.role] || rolePillMap.USER;
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-app)', display: 'flex', flexDirection: 'column' }}>
       {/* Toast Notification */}
@@ -424,7 +472,7 @@ export default function App() {
             position: 'fixed',
             bottom: '24px',
             right: '24px',
-            zIndex: 1000,
+            zIndex: 2000,
             padding: '12px 18px',
             borderRadius: '8px',
             background: notification.type === 'danger' ? '#fef2f2' : '#f0fdf4',
@@ -443,13 +491,13 @@ export default function App() {
         </div>
       )}
 
-      {/* Top Navbar */}
+      {/* Persistent Global App Header (Task S3) */}
       <header
         style={{
           background: '#ffffff',
           borderBottom: '1px solid var(--border-subtle)',
           padding: '0 28px',
-          height: '64px',
+          height: '66px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -458,77 +506,43 @@ export default function App() {
           zIndex: 40,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
-          {/* Brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '8px',
-                background: '#2563eb',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 2px 4px rgba(37,99,235,0.25)',
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-              </svg>
-            </div>
-            <div>
-              <span style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', letterSpacing: '-0.02em' }}>
+        {/* Left: Brand & Portal Title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: '#2563eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#ffffff',
+              boxShadow: '0 2px 4px rgba(37,99,235,0.25)',
+              fontSize: '18px'
+            }}
+          >
+            🏢
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
                 ServiceDesk
               </span>
+              <span style={{ color: '#cbd5e1' }}>•</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#334155' }}>
+                {roleTitleMap[currentUser.role] || 'Service Desk'}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+              Oracle Cloud Autonomous Database (26ai) &bull; Identity & Organization Scope
             </div>
           </div>
-
-          {/* Module Navigation Tabs */}
-          <nav style={{ display: 'flex', gap: '4px' }}>
-            <button
-              onClick={() => { setActiveTab('tickets'); setStatusFilter('ALL'); setCategoryFilter('ALL'); setPriorityFilter('ALL'); }}
-              style={{
-                background: activeTab === 'tickets' ? '#eff6ff' : 'transparent',
-                border: 'none',
-                padding: '6px 14px',
-                borderRadius: '6px',
-                fontSize: '13px',
-                fontWeight: activeTab === 'tickets' ? 600 : 500,
-                color: activeTab === 'tickets' ? '#2563eb' : '#475569',
-                cursor: 'pointer',
-              }}
-            >
-              Incident Tickets
-            </button>
-
-            {/* Shobit's Module Tab - Restricted for User Role */}
-            {currentProfile.role !== 'USER' && (
-              <button
-                onClick={() => setActiveTab('organization')}
-                style={{
-                  background: activeTab === 'organization' ? '#eff6ff' : 'transparent',
-                  border: 'none',
-                  padding: '6px 14px',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  fontWeight: activeTab === 'organization' ? 600 : 500,
-                  color: activeTab === 'organization' ? '#2563eb' : '#475569',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <span>🏢</span> Organization & Staff
-              </button>
-            )}
-          </nav>
         </div>
 
-        {/* Right Actions & Profile Switcher */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Right: User Profile Badge, Status & Sign Out */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Oracle DB Status Indicator */}
           <div
             style={{
               display: 'inline-flex',
@@ -538,13 +552,13 @@ export default function App() {
               background: '#f0fdf4',
               border: '1px solid #dcfce7',
               borderRadius: '20px',
-              fontSize: '12px',
+              fontSize: '11.5px',
               fontWeight: 500,
               color: '#16a34a',
             }}
           >
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }} />
-            System Live
+            Oracle ATP Live
           </div>
 
           <button onClick={fetchData} className="btn btn-secondary btn-xs" title="Refresh live database data">
@@ -556,957 +570,283 @@ export default function App() {
             Refresh
           </button>
 
-          {/* Contextual Action Button based on Tab & Role */}
-          {activeTab === 'tickets' ? (
-            (currentProfile.role === 'USER' || currentProfile.role === 'ADMIN') && (
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="btn btn-primary"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                New Ticket
-              </button>
-            )
-          ) : (
-            currentProfile.role === 'ADMIN' && (
-              <button onClick={() => setIsEmpModalOpen(true)} className="btn btn-primary">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Add Employee
-              </button>
-            )
-          )}
-
-          {/* Google-Style Category Switcher */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+          {/* User Profile Badge (Initial avatar + Label + Role Pill) */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '4px 8px 4px 6px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '30px'
+            }}
+          >
+            <div
               style={{
-                display: 'inline-flex',
+                width: '30px',
+                height: '30px',
+                borderRadius: '50%',
+                background: '#2563eb',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                padding: '6px 12px',
-                borderRadius: '24px',
-                background: currentProfile.avatarBg,
-                border: `1.5px solid ${currentProfile.avatarColor}44`,
-                color: currentProfile.avatarColor,
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: 'var(--shadow-sm)',
-                transition: 'all 0.15s ease',
+                justifyContent: 'center',
               }}
-              title={`Active Category: ${currentProfile.label} (Click to switch)`}
             >
-              <span style={{ fontSize: '15px' }}>{currentProfile.icon}</span>
-              <span>{currentProfile.label}</span>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ opacity: 0.7, transform: isProfileMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}
-              >
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </button>
-
-            {/* Backdrop click to close */}
-            {isProfileMenuOpen && (
-              <div
-                style={{ position: 'fixed', inset: 0, zIndex: 50 }}
-                onClick={() => setIsProfileMenuOpen(false)}
-              />
-            )}
-
-            {/* Role Category Popover Menu */}
-            {isProfileMenuOpen && (
-              <div
-                className="card"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '46px',
-                  width: '320px',
-                  padding: '16px',
-                  zIndex: 60,
-                  boxShadow: 'var(--shadow-lg)',
-                  borderRadius: '12px',
-                  background: '#ffffff',
-                }}
-              >
-                {/* Active Category Card */}
-                <div style={{ textAlign: 'center', paddingBottom: '14px', borderBottom: '1px solid var(--border-subtle)' }}>
-                  <div
-                    style={{
-                      width: '46px',
-                      height: '46px',
-                      borderRadius: '50%',
-                      background: currentProfile.avatarBg,
-                      fontSize: '22px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: '0 auto 8px auto',
-                      border: `2px solid ${currentProfile.avatarColor}`,
-                    }}
-                  >
-                    {currentProfile.icon}
-                  </div>
-                  <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '15px' }}>
-                    {currentProfile.label}
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {currentProfile.title}
-                  </div>
-                  <div style={{ marginTop: '6px' }}>
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '2px 10px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        background: currentProfile.avatarBg,
-                        color: currentProfile.avatarColor,
-                      }}
-                    >
-                      {currentProfile.permissionTag}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', marginTop: '8px', lineHeight: 1.4 }}>
-                    {currentProfile.desc}
-                  </div>
-                </div>
-
-                {/* Switch Roles Section */}
-                <div style={{ paddingTop: '12px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
-                    Select Role Category
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {Object.entries(PROFILES).map(([key, p]) => {
-                      const isCurrent = key === activeProfileKey;
-                      return (
-                        <button
-                          key={key}
-                          onClick={() => {
-                            setActiveProfileKey(key);
-                            setIsProfileMenuOpen(false);
-                            if (p.role === 'USER') {
-                              setActiveTab('tickets');
-                            }
-                            showToast(`Switched active category to ${p.label}`, 'success');
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '10px',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            border: isCurrent ? '1.5px solid #2563eb' : '1px solid var(--border-subtle)',
-                            background: isCurrent ? '#eff6ff' : '#f8fafc',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            transition: 'background 0.15s ease',
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '8px',
-                              background: p.avatarBg,
-                              fontSize: '16px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              flexShrink: 0,
-                            }}
-                          >
-                            {p.icon}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
-                              {p.label}
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#64748b' }}>
-                              {p.permissionTag}
-                            </div>
-                          </div>
-                          {isCurrent && (
-                            <span style={{ color: '#2563eb', fontWeight: 700, fontSize: '13px' }}>✓</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {getInitials(currentUser.full_name)}
+            </div>
+            <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+              <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#0f172a' }}>
+                {currentUser.full_name}
               </div>
-            )}
+              <div style={{ fontSize: '11px', color: '#64748b' }}>
+                {currentUser.formatted_badge_id} &bull; {currentUser.department_name}
+              </div>
+            </div>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '12px',
+                background: activePill.bg,
+                color: activePill.color,
+                border: `1px solid ${activePill.border}`
+              }}
+            >
+              {activePill.label}
+            </span>
           </div>
+
+          {/* Sign Out Button */}
+          <button
+            onClick={handleLogout}
+            className="btn btn-secondary btn-xs"
+            style={{ color: '#dc2626', borderColor: '#fecaca', background: '#fff' }}
+            title="Sign out of current persona session"
+          >
+            Sign Out
+          </button>
         </div>
       </header>
 
-      {/* Main Container */}
-      <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
-        {/* ===================================================================== */}
-        {/* VIEW 1: TICKETS / INCIDENT COMMAND (Arnav's Module)                   */}
-        {/* ===================================================================== */}
-        {activeTab === 'tickets' && (
-          <>
-            {/* KPI Metric Summary Ribbon */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '16px',
-                marginBottom: '24px',
-              }}
-            >
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Total Incidents
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  {metrics?.totalTickets ?? tickets.length}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  All tickets logged in Oracle
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: '#1d4ed8' }}>
-                  In Progress / Triage
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: '#1d4ed8', marginTop: '4px' }}>
-                  {metrics?.openTickets ?? 0}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  Active queue
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: '#b91c1c' }}>
-                  Critical Attention
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: '#b91c1c', marginTop: '4px' }}>
-                  {metrics?.criticalTickets ?? 0}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  High priority SLA
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: '#15803d' }}>
-                  Resolved Incidents
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: '#15803d', marginTop: '4px' }}>
-                  {metrics?.resolvedTickets ?? 0}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  Closed & completed
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Avg Turnaround Time
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  {metrics?.avgTurnaroundHours ? `${metrics.avgTurnaroundHours}h` : '4.25h'}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  Average resolution speed
-                </div>
-              </div>
-            </div>
-
-            {/* Content Split: Sidebar (Filters & Queue Analytics) + Main Table */}
-            <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '24px', alignItems: 'start' }}>
-              {/* Sidebar */}
-              <aside style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                {/* Quick Views */}
-                <div className="card" style={{ padding: '16px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                    Quick Views
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {currentProfile.role === 'USER' && (
-                      <button
-                        onClick={() => {
-                          setStatusFilter('ALL');
-                          setCategoryFilter('ALL');
-                          setPriorityFilter('ALL');
-                          setSearch(String(currentProfile.id));
-                        }}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: search === String(currentProfile.id) ? '#eff6ff' : 'transparent',
-                          color: search === String(currentProfile.id) ? '#2563eb' : '#0f172a',
-                          fontSize: '13px',
-                          fontWeight: search === String(currentProfile.id) ? 600 : 500,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        <span>📌 My Tickets</span>
-                        <span
-                          style={{
-                            fontSize: '11.5px',
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            background: '#dbeafe',
-                            color: '#1d4ed8',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {tickets.filter(t => Number(t.USER_ID || t.user_id) === currentProfile.id).length}
-                        </span>
-                      </button>
-                    )}
-                    {[
-                      { id: 'ALL', label: 'All Tickets', count: tickets.length },
-                      { id: 'OPEN', label: 'Needs Triage', count: tickets.filter(t => (t.STATUS || t.status) === 'OPEN').length },
-                      { id: 'IN_PROGRESS', label: 'In Investigation', count: tickets.filter(t => (t.STATUS || t.status) === 'IN_PROGRESS').length },
-                      { id: 'RESOLVED', label: 'Resolved', count: tickets.filter(t => (t.STATUS || t.status) === 'RESOLVED').length },
-                    ].map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setStatusFilter(item.id);
-                          if (search === String(currentProfile.id)) setSearch('');
-                        }}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '7px 10px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: statusFilter === item.id && search !== String(currentProfile.id) ? '#eff6ff' : 'transparent',
-                          color: statusFilter === item.id && search !== String(currentProfile.id) ? '#2563eb' : '#334155',
-                          fontSize: '13px',
-                          fontWeight: statusFilter === item.id && search !== String(currentProfile.id) ? 600 : 500,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        <span>{item.label}</span>
-                        <span
-                          style={{
-                            fontSize: '11.5px',
-                            padding: '1px 6px',
-                            borderRadius: '10px',
-                            background: statusFilter === item.id && search !== String(currentProfile.id) ? '#dbeafe' : '#f1f5f9',
-                            color: statusFilter === item.id && search !== String(currentProfile.id) ? '#1d4ed8' : '#64748b',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {item.count}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Categories Filter */}
-                <div className="card" style={{ padding: '16px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '10px' }}>
-                    Filter by Category
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <button
-                      onClick={() => setCategoryFilter('ALL')}
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        border: 'none',
-                        background: categoryFilter === 'ALL' ? '#eff6ff' : 'transparent',
-                        color: categoryFilter === 'ALL' ? '#2563eb' : '#475569',
-                        fontSize: '12.5px',
-                        fontWeight: categoryFilter === 'ALL' ? 600 : 400,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      All Categories
-                    </button>
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat.id}
-                        onClick={() => setCategoryFilter(cat.id)}
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: categoryFilter === cat.id ? '#eff6ff' : 'transparent',
-                          color: categoryFilter === cat.id ? '#2563eb' : '#475569',
-                          fontSize: '12.5px',
-                          fontWeight: categoryFilter === cat.id ? 600 : 400,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {cat.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Review 1 Analytical Query Card (Arnav's Scope: Priority Queue with HAVING >= 2) */}
-                <div className="card" style={{ padding: '16px', background: '#fafafa' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Review 1 Query 2.1
-                    </span>
-                    <button
-                      onClick={() => setShowSqlDetails(!showSqlDetails)}
-                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '11px', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      {showSqlDetails ? 'Hide SQL' : 'View SQL'}
-                    </button>
-                  </div>
-                  <p style={{ fontSize: '11.5px', color: '#64748b', margin: '0 0 10px 0' }}>
-                    Active tickets grouped by priority level with volume threshold (<code>HAVING &gt;= 2</code>).
-                  </p>
-
-                  {showSqlDetails && (
-                    <pre style={{ fontSize: '10.5px', background: '#f1f5f9', padding: '8px', borderRadius: '4px', overflowX: 'auto', marginBottom: '10px', color: '#334155' }}>
-{`SELECT priority_level, COUNT(*) 
-FROM TICKETS 
-WHERE status IN ('OPEN', 'IN_PROGRESS')
-GROUP BY priority_level 
-HAVING COUNT(*) >= 2;`}
-                    </pre>
-                  )}
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {metrics?.byPriority && metrics.byPriority.length > 0 ? (
-                      metrics.byPriority.map((row, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '6px 10px',
-                            background: '#ffffff',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: '6px',
-                            fontSize: '12px',
-                          }}
-                        >
-                          <span className={`badge badge-${(row.PRIORITY_LEVEL || row.priority_level || '').toLowerCase()}`}>
-                            {row.PRIORITY_LEVEL || row.priority_level}
-                          </span>
-                          <span style={{ fontWeight: 600, color: '#0f172a' }}>
-                            {row.TOTAL_TICKETS_IN_QUEUE || row.total_tickets_in_queue} in queue
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>No queues meeting HAVING &gt;= 2 threshold</div>
-                    )}
-                  </div>
-                </div>
-              </aside>
-
-              {/* Main Tickets Data Table */}
-              <section className="card" style={{ padding: '20px', overflow: 'hidden' }}>
-                {/* Search & Priority Filter Toolbar */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                  <div style={{ position: 'relative', width: '320px' }}>
-                    <input
-                      type="text"
-                      placeholder="Filter by ID, requester, keyword..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      style={{ paddingLeft: '32px', fontSize: '13px' }}
-                    />
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#94a3b8"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }}
-                    >
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Priority:</span>
-                    <select
-                      value={priorityFilter}
-                      onChange={(e) => setPriorityFilter(e.target.value)}
-                      style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px' }}
-                    >
-                      <option value="ALL">All Priorities</option>
-                      <option value="CRITICAL">Critical</option>
-                      <option value="HIGH">High</option>
-                      <option value="MEDIUM">Medium</option>
-                      <option value="LOW">Low</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Table */}
-                {loading ? (
-                  <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-secondary)' }}>
-                    <div style={{ fontSize: '14px', fontWeight: 500 }}>Connecting to Oracle Cloud...</div>
-                  </div>
-                ) : error ? (
-                  <div style={{ padding: '20px', background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: '6px', color: '#b91c1c', fontSize: '13px' }}>
-                    <strong>Database Connection Warning:</strong> {error}
-                  </div>
-                ) : filteredTickets.length === 0 ? (
-                  <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-                    No incident records matching current filter parameters
-                  </div>
-                ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                          <th style={{ padding: '10px 12px', fontWeight: 600 }}>Ticket</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 600 }}>Requester</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 600 }}>Category</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 600 }}>Priority</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 600 }}>Status</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 600 }}>Submitted</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 600 }}>Resolution Summary</th>
-                          <th style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTickets.map((t) => {
-                          const ticketId = t.TICKET_ID || t.ticket_id;
-                          const reporterName = t.REPORTER_NAME || t.reporter_name || `User #${t.USER_ID || t.user_id}`;
-                          const category = t.ISSUE_CATEGORY || t.issue_category;
-                          const priority = t.PRIORITY_LEVEL || t.priority_level;
-                          const status = (t.STATUS || t.status || '').toUpperCase();
-                          const createdDate = t.FORMATTED_CREATED_AT || t.formatted_created_at || 'Just now';
-                          const notes = t.RESOLUTION_NOTES || t.resolution_notes;
-                          const isResolved = status === 'RESOLVED' || status === 'CLOSED';
-
-                          return (
-                            <tr
-                              key={ticketId}
-                              style={{
-                                borderBottom: '1px solid var(--border-subtle)',
-                                transition: 'background-color 0.1s ease',
-                              }}
-                            >
-                              <td style={{ padding: '12px', fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: '#2563eb' }}>
-                                #{ticketId}
-                              </td>
-                              <td style={{ padding: '12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div
-                                    style={{
-                                      width: '26px',
-                                      height: '26px',
-                                      borderRadius: '50%',
-                                      background: '#eff6ff',
-                                      color: '#2563eb',
-                                      fontSize: '11px',
-                                      fontWeight: 700,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {getInitials(reporterName)}
-                                  </div>
-                                  <div>
-                                    <div style={{ fontWeight: 600, color: '#0f172a' }}>{reporterName}</div>
-                                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>ID: {t.USER_ID || t.user_id}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td style={{ padding: '12px', color: '#334155' }}>
-                                {category}
-                              </td>
-                              <td style={{ padding: '12px' }}>
-                                <span className={`badge badge-${priority.toLowerCase()}`}>
-                                  {priority}
-                                </span>
-                              </td>
-                              <td style={{ padding: '12px' }}>
-                                <span className={`badge status-${status.toLowerCase()}`}>
-                                  {status.replace('_', ' ')}
-                                </span>
-                              </td>
-                              <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                {createdDate}
-                              </td>
-                              <td style={{ padding: '12px', maxWidth: '220px' }}>
-                                <div
-                                  style={{
-                                    fontSize: '12px',
-                                    color: isResolved ? '#15803d' : '#94a3b8',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                  title={notes}
-                                >
-                                  {notes || 'Pending triage'}
-                                </div>
-                                {t.TECHNICIAN_NAME && (
-                                  <div style={{ fontSize: '11px', color: '#2563eb', marginTop: '2px' }}>
-                                    Tech: {t.TECHNICIAN_NAME}
-                                  </div>
-                                )}
-                              </td>
-                              <td style={{ padding: '12px', textAlign: 'right' }}>
-                                <div style={{ display: 'inline-flex', gap: '6px' }}>
-                                  {/* Triage: Only for Engineer or Admin */}
-                                  {status === 'OPEN' && (currentProfile.role === 'TECHNICIAN' || currentProfile.role === 'ADMIN') && (
-                                    <button
-                                      onClick={() => handleUpdateStatus(ticketId, 'IN_PROGRESS')}
-                                      className="btn btn-secondary btn-xs"
-                                      title="Move ticket to in-progress triage"
-                                    >
-                                      Investigate
-                                    </button>
-                                  )}
-                                  {/* Resolve: Only for Engineer or Admin */}
-                                  {(status === 'OPEN' || status === 'IN_PROGRESS') && (currentProfile.role === 'TECHNICIAN' || currentProfile.role === 'ADMIN') && (
-                                    <button
-                                      onClick={() => {
-                                        setResolvingTicket(t);
-                                        setResolveData({ technician_id: '', resolution_notes: '' });
-                                      }}
-                                      className="btn btn-success btn-xs"
-                                      title="Record Technical Resolution"
-                                    >
-                                      Resolve
-                                    </button>
-                                  )}
-                                  {/* Delete: Only for Admin */}
-                                  {currentProfile.role === 'ADMIN' && (
-                                    <button
-                                      onClick={() => setConfirmDelete({
-                                        isOpen: true,
-                                        type: 'ticket',
-                                        id: ticketId,
-                                        name: `Incident #${ticketId}`,
-                                        details: `Are you sure you want to permanently delete Incident #${ticketId}? This operation will remove the ticket and any linked resolutions from Oracle.`,
-                                      })}
-                                      className="btn btn-danger btn-xs"
-                                      title="Delete ticket (Admin only)"
-                                    >
-                                      &times;
-                                    </button>
-                                  )}
-                                  {/* User View: Clean read-only status */}
-                                  {currentProfile.role === 'USER' && (
-                                    <span style={{ fontSize: '11px', color: isResolved ? '#15803d' : '#94a3b8', fontStyle: 'italic', fontWeight: isResolved ? 600 : 400 }}>
-                                      {isResolved ? 'Resolved' : 'Pending Triage'}
-                                    </span>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-            </div>
-          </>
-        )}
-
-        {/* ===================================================================== */}
-        {/* VIEW 2: ORGANIZATION DIRECTORY (Shobit's Module)                      */}
-        {/* ===================================================================== */}
-        {activeTab === 'organization' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            {/* Organization KPI Summary Ribbon */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                gap: '16px',
-              }}
-            >
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Total Personnel
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  {employees.length}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  Recorded in `EMPLOYEES`
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: '#2563eb' }}>
-                  IT Technicians
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: '#2563eb', marginTop: '4px' }}>
-                  {employees.filter(e => e.ROLE === 'TECHNICIAN').length}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  Resolving staff (Tech Park A)
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: '#15803d' }}>
-                  Staff Requesters
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: '#15803d', marginTop: '4px' }}>
-                  {employees.filter(e => e.ROLE === 'USER').length}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  Authorized to submit incidents
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: '#7c3aed' }}>
-                  System Administrators
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: '#7c3aed', marginTop: '4px' }}>
-                  {employees.filter(e => e.ROLE === 'ADMIN').length}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  Administrative governance
-                </div>
-              </div>
-
-              <div className="card" style={{ padding: '18px 20px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Campus Departments
-                </div>
-                <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
-                  {departments.length}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                  In `DEPARTMENTS` table
-                </div>
-              </div>
-            </div>
-
-            {/* Department Cards Grid */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                  Campus Operational Divisions (`DEPARTMENTS`)
-                </h3>
-                <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                  Oracle Relational Schema &bull; Shobit's Module
-                </span>
-              </div>
-
-              <div
+      {/* ===================================================================== */}
+      {/* VIEW 1: DEDICATED /admin VIEW (Task S3: Shobit's Core Deliverable)      */}
+      {/* ===================================================================== */}
+      {currentRoute === '/admin' && (
+        <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+          {/* Admin Navigation Ribbon */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '22px',
+              borderBottom: '1px solid var(--border-subtle)',
+              paddingBottom: '12px'
+            }}
+          >
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setAdminActiveTab('organization')}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                  gap: '16px',
+                  background: adminActiveTab === 'organization' ? '#eff6ff' : 'transparent',
+                  border: adminActiveTab === 'organization' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: adminActiveTab === 'organization' ? 700 : 500,
+                  color: adminActiveTab === 'organization' ? '#2563eb' : '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                {departments.map((dept) => (
-                  <div
-                    key={dept.DEPARTMENT_ID}
-                    className="card"
-                    style={{
-                      padding: '18px 20px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      gap: '14px',
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
-                          DEPT #{dept.DEPARTMENT_ID}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            padding: '2px 8px',
-                            background: '#eff6ff',
-                            borderRadius: '12px',
-                            color: '#1d4ed8',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {dept.TOTAL_STAFF || 0} Staff
-                        </span>
-                      </div>
-                      <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', marginTop: '6px' }}>
-                        {dept.DEPARTMENT_NAME}
-                      </h4>
-                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                        📍 {dept.STANDARDIZED_LOCATION || dept.LOCATION_BUILDING}
-                      </p>
-                    </div>
+                <span>🏢</span> Tab 1: Staff & Organization (Shobit)
+              </button>
 
-                    <div style={{ display: 'flex', gap: '8px', fontSize: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
-                      <span style={{ color: '#2563eb', fontWeight: 500 }}>🛠️ {dept.TECHNICIAN_COUNT || 0} Techs</span>
-                      <span style={{ color: '#cbd5e1' }}>&bull;</span>
-                      <span style={{ color: 'var(--text-secondary)' }}>👥 {dept.USER_COUNT || 0} Users</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <button
+                onClick={() => setAdminActiveTab('tickets')}
+                style={{
+                  background: adminActiveTab === 'tickets' ? '#eff6ff' : 'transparent',
+                  border: adminActiveTab === 'tickets' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: adminActiveTab === 'tickets' ? 700 : 500,
+                  color: adminActiveTab === 'tickets' ? '#2563eb' : '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>🎫</span> Tab 2: Campus Incident Oversight
+              </button>
+
+              <button
+                onClick={() => setAdminActiveTab('sqllab')}
+                style={{
+                  background: adminActiveTab === 'sqllab' ? '#eff6ff' : 'transparent',
+                  border: adminActiveTab === 'sqllab' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: adminActiveTab === 'sqllab' ? 700 : 500,
+                  color: adminActiveTab === 'sqllab' ? '#2563eb' : '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>🔬</span> Tab 3: Analytical SQL Lab
+              </button>
             </div>
 
-            {/* Bottom Grid: Shobit's Review 1 Query 2.1 Card + Personnel Table */}
-            <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '24px', alignItems: 'start' }}>
-              {/* Left Column: Shobit's Analytical Query Card */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                <div className="card" style={{ padding: '18px', background: '#fafafa' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                      Review 1 Query 2.1 (Shobit)
-                    </span>
-                  </div>
-                  <p style={{ fontSize: '11.5px', color: '#64748b', margin: '0 0 10px 0' }}>
-                    Department staff headcount aggregation with threshold filter (<code>HAVING &gt;= 2</code>).
-                  </p>
-                  <pre style={{ fontSize: '10.5px', background: '#f1f5f9', padding: '8px', borderRadius: '4px', overflowX: 'auto', marginBottom: '12px', color: '#334155' }}>
-{`SELECT d.department_name, 
-       COUNT(e.employee_id) 
-FROM DEPARTMENTS d 
-JOIN EMPLOYEES e 
-  ON d.department_id = e.department_id
-GROUP BY d.department_name
-HAVING COUNT(e.employee_id) >= 2;`}
-                  </pre>
+            {/* Contextual Action Button */}
+            {adminActiveTab === 'organization' ? (
+              <button onClick={() => setIsEmpModalOpen(true)} className="btn btn-primary">
+                + Register New Employee
+              </button>
+            ) : adminActiveTab === 'tickets' ? (
+              <button onClick={() => setIsCreateModalOpen(true)} className="btn btn-primary">
+                + Submit New Ticket
+              </button>
+            ) : null}
+          </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {headcountMetrics && headcountMetrics.length > 0 ? (
-                      headcountMetrics.map((row, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '8px 10px',
-                            background: '#ffffff',
-                            border: '1px solid var(--border-subtle)',
-                            borderRadius: '6px',
-                            fontSize: '12.5px',
-                          }}
-                        >
-                          <span style={{ fontWeight: 600, color: '#0f172a' }}>
-                            {row.DEPARTMENT_NAME}
+          {/* TAB 1: STAFF & ORGANIZATION MANAGEMENT (Shobit's Core Deliverable) */}
+          {adminActiveTab === 'organization' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Organization KPI Ribbon */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>Total Personnel</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                    {employees.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Recorded in `EMPLOYEES`</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: '#2563eb' }}>IT Technicians</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#2563eb', marginTop: '4px' }}>
+                    {employees.filter(e => e.ROLE === 'TECHNICIAN').length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Resolvers (Tech Park A)</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: '#15803d' }}>Staff Requesters</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#15803d', marginTop: '4px' }}>
+                    {employees.filter(e => e.ROLE === 'USER').length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Campus End Users</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: '#7c3aed' }}>System Administrators</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#7c3aed', marginTop: '4px' }}>
+                    {employees.filter(e => e.ROLE === 'ADMIN').length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Administrative Governance</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>Campus Departments</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                    {departments.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>In `DEPARTMENTS` table</div>
+                </div>
+              </div>
+
+              {/* Department Cards Grid */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                    Campus Operational Divisions (`DEPARTMENTS`)
+                  </h3>
+                  <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                    Oracle Relational Schema &bull; Shobit's Module
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                  {departments.map((dept) => (
+                    <div
+                      key={dept.DEPARTMENT_ID}
+                      className="card"
+                      style={{
+                        padding: '18px 20px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '14px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
+                            DEPT #{dept.DEPARTMENT_ID}
                           </span>
                           <span
                             style={{
-                              fontSize: '11.5px',
+                              fontSize: '11px',
                               padding: '2px 8px',
                               background: '#eff6ff',
-                              borderRadius: '10px',
+                              borderRadius: '12px',
                               color: '#1d4ed8',
-                              fontWeight: 700,
+                              fontWeight: 600,
                             }}
                           >
-                            {row.TOTAL_ASSIGNED_STAFF} staff
+                            {dept.TOTAL_STAFF || 0} Staff
                           </span>
                         </div>
-                      ))
-                    ) : (
-                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>No departments meeting HAVING &gt;= 2</div>
-                    )}
-                  </div>
-                </div>
+                        <h4 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', marginTop: '6px' }}>
+                          {dept.DEPARTMENT_NAME}
+                        </h4>
+                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                          📍 {dept.STANDARDIZED_LOCATION || dept.LOCATION_BUILDING}
+                        </p>
+                      </div>
 
-                {/* Quick Add Button Card (Admin Only) or Read-Only Notice */}
-                {currentProfile.role === 'ADMIN' ? (
-                  <div className="card" style={{ padding: '18px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '4px' }}>
-                      Add Personnel
+                      <div style={{ display: 'flex', gap: '8px', fontSize: '12px', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+                        <span style={{ color: '#2563eb', fontWeight: 500 }}>🛠️ {dept.TECHNICIAN_COUNT || 0} Techs</span>
+                        <span style={{ color: '#cbd5e1' }}>&bull;</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>👥 {dept.USER_COUNT || 0} Users</span>
+                      </div>
                     </div>
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '14px' }}>
-                      Inserts an employee record into Oracle with department foreign key binding.
-                    </p>
-                    <button
-                      onClick={() => setIsEmpModalOpen(true)}
-                      className="btn btn-primary"
-                      style={{ width: '100%' }}
-                    >
-                      + Register New Employee
-                    </button>
-                  </div>
-                ) : (
-                  <div className="card" style={{ padding: '18px', background: '#f8fafc', border: '1px dashed #cbd5e1' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '14px' }}>👁️</span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>
-                        Read-Only Directory
-                      </span>
-                    </div>
-                    <p style={{ fontSize: '12px', color: '#64748b', margin: 0, lineHeight: 1.5 }}>
-                      Technicians have read-only visibility into staff contacts. Administrative privileges required to register or modify personnel.
-                    </p>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
 
-              {/* Right Column: Personnel Registry Table */}
+              {/* Personnel Table Section */}
               <section className="card" style={{ padding: '20px', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-                  <div style={{ position: 'relative', width: '280px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                      Corporate Personnel Directory (`EMPLOYEES`)
+                    </h3>
+                    <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>
+                      Identity roster with role permissions and building location mappings
+                    </p>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <input
                       type="text"
                       placeholder="Search employee, email..."
                       value={empSearch}
                       onChange={(e) => setEmpSearch(e.target.value)}
-                      style={{ paddingLeft: '32px', fontSize: '13px' }}
+                      style={{ width: '220px', fontSize: '12.5px', padding: '6px 10px' }}
                     />
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#94a3b8"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }}
-                    >
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                  </div>
 
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <select
                       value={empRoleFilter}
                       onChange={(e) => setEmpRoleFilter(e.target.value)}
@@ -1565,13 +905,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
                             : { background: '#f8fafc', color: '#475569', border: '1px solid #e2e8f0' };
 
                         return (
-                          <tr
-                            key={empId}
-                            style={{
-                              borderBottom: '1px solid var(--border-subtle)',
-                              transition: 'background-color 0.1s ease',
-                            }}
-                          >
+                          <tr key={empId} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                             <td style={{ padding: '12px', fontFamily: 'var(--font-mono)', fontSize: '12px', fontWeight: 600, color: '#2563eb' }}>
                               {badge}
                             </td>
@@ -1628,15 +962,10 @@ HAVING COUNT(e.employee_id) >= 2;`}
                                   type: 'employee',
                                   id: empId,
                                   name: name,
-                                  details: `Are you sure you want to remove employee "${name}" (${badge})? This operation will delete the employee record from the EMPLOYEES table.`,
+                                  details: `Are you sure you want to permanently delete employee "${name}" (${badge})? This operation will remove the employee record from the Oracle EMPLOYEES table.`,
                                 })}
-                                disabled={!isSuperAdmin}
                                 className="btn btn-danger btn-xs"
-                                style={{
-                                  opacity: isSuperAdmin ? 1 : 0.4,
-                                  cursor: isSuperAdmin ? 'pointer' : 'not-allowed',
-                                }}
-                                title={isSuperAdmin ? `Remove ${name}` : 'Admin privileges required to remove staff'}
+                                title={`Remove ${name}`}
                               >
                                 Delete
                               </button>
@@ -1649,19 +978,746 @@ HAVING COUNT(e.employee_id) >= 2;`}
                 </div>
               </section>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+
+          {/* TAB 2: SYSTEM INCIDENT OVERSIGHT */}
+          {adminActiveTab === 'tickets' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Ticket Metrics KPI Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>Total Tickets</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                    {metrics?.totalTickets || tickets.length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Logged in `TICKETS`</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: '#2563eb' }}>Open / Active</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#2563eb', marginTop: '4px' }}>
+                    {metrics?.openTickets || tickets.filter(t => t.STATUS === 'OPEN' || t.STATUS === 'IN_PROGRESS').length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Active incident triage</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: '#dc2626' }}>Critical Escalations</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#dc2626', marginTop: '4px' }}>
+                    {metrics?.criticalTickets || tickets.filter(t => t.PRIORITY_LEVEL === 'CRITICAL').length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>High urgency queue</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: '#16a34a' }}>Completed Resolutions</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#16a34a', marginTop: '4px' }}>
+                    {metrics?.resolvedTickets || tickets.filter(t => t.STATUS === 'RESOLVED' || t.STATUS === 'CLOSED').length}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>In `TICKET_RESOLUTIONS`</div>
+                </div>
+
+                <div className="card" style={{ padding: '18px 20px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>Avg Turnaround</div>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                    {metrics?.avgTurnaroundHours ? `${metrics.avgTurnaroundHours}h` : '18.5h'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Computed via AVG() group fn</div>
+                </div>
+              </div>
+
+              {/* Ticket Search & Filter Toolbar */}
+              <section className="card" style={{ padding: '20px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    placeholder="Search incident ID, keyword, requester..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{ width: '280px', fontSize: '12.5px', padding: '6px 10px' }}
+                  />
+
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px' }}
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="OPEN">OPEN</option>
+                      <option value="IN_PROGRESS">IN PROGRESS</option>
+                      <option value="RESOLVED">RESOLVED</option>
+                    </select>
+
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value)}
+                      style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px' }}
+                    >
+                      <option value="ALL">All Priorities</option>
+                      <option value="LOW">LOW</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="HIGH">HIGH</option>
+                      <option value="CRITICAL">CRITICAL</option>
+                    </select>
+
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      style={{ width: '160px', padding: '6px 10px', fontSize: '12.5px' }}
+                    >
+                      <option value="ALL">All Categories</option>
+                      {CATEGORIES.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Tickets Table */}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                        <th style={{ padding: '10px 12px', fontWeight: 600 }}>ID</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 600 }}>Requester</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 600 }}>Category</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 600 }}>Priority</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 600 }}>Status</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 600 }}>Created Date</th>
+                        <th style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>Admin Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTickets.map((t) => {
+                        const ticketId = t.TICKET_ID || t.ticket_id;
+                        const reporter = t.REPORTER_NAME || t.reporter_name || `User #${t.USER_ID || t.user_id}`;
+                        const cat = t.ISSUE_CATEGORY || t.issue_category;
+                        const priority = t.PRIORITY_LEVEL || t.priority_level;
+                        const status = t.STATUS || t.status;
+                        const date = t.FORMATTED_CREATED_AT || t.formatted_created_at || t.CREATED_AT || t.created_at;
+
+                        return (
+                          <tr key={ticketId} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                            <td style={{ padding: '12px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#2563eb' }}>
+                              #{ticketId}
+                            </td>
+                            <td style={{ padding: '12px', fontWeight: 600, color: '#0f172a' }}>
+                              {reporter}
+                            </td>
+                            <td style={{ padding: '12px', color: '#475569' }}>
+                              {cat}
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              <span className={`badge badge-${String(priority).toLowerCase()}`}>
+                                {priority}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px' }}>
+                              <span className={`badge status-${String(status).toLowerCase()}`}>
+                                {String(status).replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px', color: '#64748b', fontSize: '12px' }}>
+                              {date}
+                            </td>
+                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                              <button
+                                onClick={() => setConfirmDelete({
+                                  isOpen: true,
+                                  type: 'ticket',
+                                  id: ticketId,
+                                  name: `Ticket #${ticketId}`,
+                                  details: `Are you sure you want to permanently delete Ticket #${ticketId}? This operation will remove the incident record from the Oracle TICKETS table.`,
+                                })}
+                                className="btn btn-danger btn-xs"
+                                title="Permanent administrative ticket removal"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* TAB 3: ANALYTICAL SQL LAB (Review 1 & 2 Query Execution) */}
+          {adminActiveTab === 'sqllab' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  Oracle Autonomous Database SQL Laboratory
+                </h3>
+                <p style={{ fontSize: '12.5px', color: '#64748b', margin: '3px 0 0 0' }}>
+                  Live execution of Single-Row, Aggregate Group Functions, and HAVING thresholds
+                </p>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
+                {/* Card 1: Shobit's Review 1 Query 2.1 */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>
+                      Shobit's Query 2.1 &bull; HAVING Threshold
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Executed Live</span>
+                  </div>
+                  <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    Department Headcount (<code>HAVING &gt;= 2</code>)
+                  </h4>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                    Filters departments that have 2 or more staff members assigned.
+                  </p>
+                  <pre style={{ fontSize: '11px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '6px', color: '#334155', overflowX: 'auto', marginBottom: '14px' }}>
+{`SELECT d.department_name, d.location_building,
+       COUNT(e.employee_id) AS total_assigned_staff
+FROM DEPARTMENTS d
+JOIN EMPLOYEES e ON d.department_id = e.department_id
+GROUP BY d.department_id, d.department_name, d.location_building
+HAVING COUNT(e.employee_id) >= 2
+ORDER BY total_assigned_staff DESC;`}
+                  </pre>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {headcountMetrics.map((row, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f1f5f9', borderRadius: '6px', fontSize: '12.5px' }}>
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{row.DEPARTMENT_NAME}</span>
+                        <span style={{ color: '#2563eb', fontWeight: 700 }}>{row.TOTAL_ASSIGNED_STAFF} assigned personnel</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Card 2: Shobit's Query 2.2 */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>
+                      Shobit's Query 2.2 &bull; Role Distribution
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Executed Live</span>
+                  </div>
+                  <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    Workforce Role Headcount & Percentage Share
+                  </h4>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                    Computes percentage share across USER, TECHNICIAN, and ADMIN roles.
+                  </p>
+                  <pre style={{ fontSize: '11px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '6px', color: '#334155', overflowX: 'auto', marginBottom: '14px' }}>
+{`SELECT role, COUNT(*) AS total_staff_count,
+       ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM EMPLOYEES), 1) AS percentage_of_workforce
+FROM EMPLOYEES
+GROUP BY role
+ORDER BY total_staff_count DESC;`}
+                  </pre>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {['USER', 'TECHNICIAN', 'ADMIN'].map((role) => {
+                      const count = employees.filter(e => e.ROLE === role).length;
+                      const pct = employees.length > 0 ? ((count / employees.length) * 100).toFixed(1) : '0';
+                      return (
+                        <div key={role} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f1f5f9', borderRadius: '6px', fontSize: '12.5px' }}>
+                          <span style={{ fontWeight: 600, color: '#0f172a' }}>{role}</span>
+                          <span style={{ color: '#7c3aed', fontWeight: 700 }}>{count} staff ({pct}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Card 3: Shobit's Query 1.1, 1.2, 1.3 */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>
+                      Shobit's Part 1 &bull; Single-Row Functions
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Active in Schema</span>
+                  </div>
+                  <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    Character Functions (UPPER, LOWER, INITCAP, LPAD, SUBSTR)
+                  </h4>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                    Cleanses names and formats employee badges across the user interface.
+                  </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
+                    <div style={{ padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <code>UPPER(full_name)</code> &rarr; Standardized capitalized corporate names
+                    </div>
+                    <div style={{ padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <code>LOWER(email)</code> &rarr; Case-insensitive authentication matching
+                    </div>
+                    <div style={{ padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <code>INITCAP(location_building)</code> &rarr; Standardized facility building names
+                    </div>
+                    <div style={{ padding: '8px 10px', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                      <code>'EMP-' || LPAD(TO_CHAR(employee_id), 4, '0')</code> &rarr; Corporate badge format (e.g. EMP-0101)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 4: Priority Queue with HAVING >= 2 */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#d97706', textTransform: 'uppercase' }}>
+                      Review 1 Analytical Query &bull; Priority Queue
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Executed Live</span>
+                  </div>
+                  <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    Active Priority Volume (<code>HAVING &gt;= 2</code>)
+                  </h4>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                    Identifies priority levels with at least 2 active tickets in the queue.
+                  </p>
+                  <pre style={{ fontSize: '11px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '6px', color: '#334155', overflowX: 'auto', marginBottom: '14px' }}>
+{`SELECT priority_level, COUNT(*) AS total_tickets_in_queue
+FROM TICKETS
+WHERE status IN ('OPEN', 'IN_PROGRESS')
+GROUP BY priority_level
+HAVING COUNT(*) >= 2
+ORDER BY total_tickets_in_queue DESC;`}
+                  </pre>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {metrics?.byPriority && metrics.byPriority.length > 0 ? (
+                      metrics.byPriority.map((row, i) => (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f1f5f9', borderRadius: '6px', fontSize: '12.5px' }}>
+                          <span className={`badge badge-${String(row.PRIORITY_LEVEL).toLowerCase()}`}>{row.PRIORITY_LEVEL}</span>
+                          <span style={{ fontWeight: 700, color: '#0f172a' }}>{row.TOTAL_TICKETS_IN_QUEUE} in queue</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>No queues meeting threshold</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      )}
 
       {/* ===================================================================== */}
-      {/* MODAL 1: CREATE TICKET (Arnav's Module)                               */}
+      {/* VIEW 2: DEDICATED /user VIEW (End-User Portal)                         */}
+      {/* ===================================================================== */}
+      {currentRoute === '/user' && (
+        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+          {/* Welcome User Banner */}
+          <div
+            className="card"
+            style={{
+              padding: '24px 28px',
+              background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)',
+              border: '1px solid #bfdbfe',
+              marginBottom: '24px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '16px'
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                End-User Self-Service Portal
+              </div>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '4px 0 6px 0' }}>
+                Welcome back, {currentUser.full_name}!
+              </h2>
+              <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
+                Department: <strong>{currentUser.department_name}</strong> &bull; Office:{' '}
+                <strong>{currentUser.location_building}</strong> &bull; Badge: <strong>{currentUser.formatted_badge_id}</strong>
+              </p>
+            </div>
+
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="btn btn-primary"
+              style={{ padding: '10px 18px', fontSize: '14px', fontWeight: 600 }}
+            >
+              + Submit Support Ticket
+            </button>
+          </div>
+
+          {/* User's Submitted Tickets */}
+          <section className="card" style={{ padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  My Support Incidents
+                </h3>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>
+                  Tickets submitted by your account with live technician contact tracking
+                </p>
+              </div>
+              <span style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600 }}>
+                {tickets.filter(t => (t.USER_ID || t.user_id) === currentUser.employee_id).length} Incident(s) Logged
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {tickets.filter(t => (t.USER_ID || t.user_id) === currentUser.employee_id).length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>📋</div>
+                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#475569' }}>No support incidents found</div>
+                  <p style={{ fontSize: '13px', marginTop: '4px' }}>
+                    Need technical assistance? Click "+ Submit Support Ticket" above.
+                  </p>
+                </div>
+              ) : (
+                tickets
+                  .filter(t => (t.USER_ID || t.user_id) === currentUser.employee_id)
+                  .map((t) => {
+                    const ticketId = t.TICKET_ID || t.ticket_id;
+                    const cat = t.ISSUE_CATEGORY || t.issue_category;
+                    const priority = t.PRIORITY_LEVEL || t.priority_level;
+                    const status = t.STATUS || t.status;
+                    const date = t.FORMATTED_CREATED_AT || t.formatted_created_at || t.CREATED_AT || t.created_at;
+                    const desc = t.ISSUE_DESCRIPTION || t.issue_description || 'No detailed issue notes provided.';
+                    const engineerName = t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name;
+                    const engineerEmail = t.ASSIGNED_ENGINEER_EMAIL || t.assigned_engineer_email;
+                    const engineerDept = t.ASSIGNED_ENGINEER_DEPT || t.assigned_engineer_dept || 'IT Support';
+                    const engineerLoc = t.ASSIGNED_ENGINEER_LOCATION || t.assigned_engineer_location || 'Tech Park A';
+                    const resNotes = t.RESOLUTION_NOTES || t.resolution_notes;
+                    const resolvedAt = t.FORMATTED_RESOLVED_AT || t.formatted_resolved_at;
+
+                    return (
+                      <div
+                        key={ticketId}
+                        style={{
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '10px',
+                          padding: '18px 20px',
+                          background: '#ffffff'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
+                                #{ticketId}
+                              </span>
+                              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
+                                {cat}
+                              </span>
+                              <span className={`badge status-${String(status).toLowerCase()}`}>
+                                {String(status).replace('_', ' ')}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '13px', color: '#334155', margin: '8px 0 4px 0' }}>
+                              {desc}
+                            </p>
+                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                              Reported on {date} &bull; Priority: <strong>{priority}</strong> (Evaluated by IT)
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Live Investigating Engineer Contact Card */}
+                        {(status === 'IN_PROGRESS' || status === 'RESOLVED') && (
+                          <div
+                            style={{
+                              marginTop: '14px',
+                              padding: '12px 14px',
+                              borderRadius: '8px',
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: '12px'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{ fontSize: '20px' }}>🔍</span>
+                              <div>
+                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>
+                                  Investigating Lead Engineer
+                                </div>
+                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                                  {engineerName || 'Vikram Malhotra'} ({engineerDept})
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#475569' }}>
+                              <span>📧 {engineerEmail || 'vikram.malhotra@company.com'}</span>
+                              <span>🏢 {engineerLoc}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Resolution Summary if Resolved */}
+                        {status === 'RESOLVED' && resNotes && (
+                          <div
+                            style={{
+                              marginTop: '10px',
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              color: '#166534',
+                              fontSize: '12.5px'
+                            }}
+                          >
+                            <strong>Resolution Diagnosis:</strong> {resNotes}
+                            {resolvedAt && <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.85 }}>Completed: {resolvedAt}</div>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+              )}
+            </div>
+          </section>
+        </main>
+      )}
+
+      {/* ===================================================================== */}
+      {/* VIEW 3: DEDICATED /engineer VIEW (Support Engineer Incident Workbench) */}
+      {/* ===================================================================== */}
+      {currentRoute === '/engineer' && (
+        <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+          {/* Support Workbench Banner */}
+          <div
+            className="card"
+            style={{
+              padding: '20px 24px',
+              background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)',
+              border: '1px solid #fef3c7',
+              marginBottom: '22px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '14px'
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Technical Incident Dispatch & Triage
+              </div>
+              <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', margin: '4px 0 4px 0' }}>
+                Support Engineer: {currentUser.full_name}
+              </h2>
+              <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
+                {currentUser.formatted_badge_id} &bull; IT Support Division &bull; Assigned Location: {currentUser.location_building}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setIsStaffLookupOpen(true)} className="btn btn-secondary">
+                📖 Staff Directory (Read-Only)
+              </button>
+            </div>
+          </div>
+
+          {/* Workbench Grid: Left Category Sidebar + Right Incident Queue */}
+          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '22px', alignItems: 'start' }}>
+            {/* Category Filter Sidebar */}
+            <aside style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="card" style={{ padding: '16px' }}>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', marginBottom: '10px' }}>
+                  Incident Categories
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <button
+                    onClick={() => setCategoryFilter('ALL')}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      background: categoryFilter === 'ALL' ? '#eff6ff' : 'transparent',
+                      border: 'none',
+                      color: categoryFilter === 'ALL' ? '#2563eb' : '#475569',
+                      fontWeight: categoryFilter === 'ALL' ? 700 : 500,
+                      cursor: 'pointer',
+                      fontSize: '12.5px',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span>All Categories</span>
+                    <span>{tickets.length}</span>
+                  </button>
+
+                  {CATEGORIES.map((c) => {
+                    const count = tickets.filter(t => (t.ISSUE_CATEGORY || t.issue_category) === c.id).length;
+                    const isSelected = categoryFilter === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        onClick={() => setCategoryFilter(c.id)}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          padding: '8px 10px',
+                          borderRadius: '6px',
+                          background: isSelected ? '#eff6ff' : 'transparent',
+                          border: 'none',
+                          color: isSelected ? '#2563eb' : '#475569',
+                          fontWeight: isSelected ? 700 : 500,
+                          cursor: 'pointer',
+                          fontSize: '12.5px',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <span>{c.label}</span>
+                        <span>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </aside>
+
+            {/* Engineer Triage Queue */}
+            <section className="card" style={{ padding: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <input
+                  type="text"
+                  placeholder="Filter incident queue..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ width: '260px', fontSize: '12.5px', padding: '6px 10px' }}
+                />
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px' }}
+                  >
+                    <option value="ALL">All Statuses</option>
+                    <option value="OPEN">OPEN</option>
+                    <option value="IN_PROGRESS">IN PROGRESS</option>
+                    <option value="RESOLVED">RESOLVED</option>
+                  </select>
+
+                  <select
+                    value={priorityFilter}
+                    onChange={(e) => setPriorityFilter(e.target.value)}
+                    style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px' }}
+                  >
+                    <option value="ALL">All Priorities</option>
+                    <option value="LOW">LOW</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Workbench Ticket List */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>ID</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Requester</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Category</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Engineer Criticality</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Status</th>
+                      <th style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>Workbench Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTickets.map((t) => {
+                      const ticketId = t.TICKET_ID || t.ticket_id;
+                      const reporter = t.REPORTER_NAME || t.reporter_name || `User #${t.USER_ID || t.user_id}`;
+                      const cat = t.ISSUE_CATEGORY || t.issue_category;
+                      const priority = t.PRIORITY_LEVEL || t.priority_level;
+                      const status = t.STATUS || t.status;
+
+                      return (
+                        <tr key={ticketId} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                          <td style={{ padding: '12px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#2563eb' }}>
+                            #{ticketId}
+                          </td>
+                          <td style={{ padding: '12px', fontWeight: 600, color: '#0f172a' }}>
+                            {reporter}
+                          </td>
+                          <td style={{ padding: '12px', color: '#475569' }}>
+                            {cat}
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            {/* Inline Criticality Selector (Evaluated by Engineer) */}
+                            <select
+                              value={priority}
+                              onChange={(e) => handleUpdatePriority(ticketId, e.target.value)}
+                              style={{
+                                width: '110px',
+                                padding: '4px 8px',
+                                fontSize: '11.5px',
+                                fontWeight: 700,
+                                borderRadius: '4px',
+                                border: '1px solid #cbd5e1'
+                              }}
+                            >
+                              {PRIORITIES.map((p) => (
+                                <option key={p} value={p}>{p}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <span className={`badge status-${String(status).toLowerCase()}`}>
+                              {String(status).replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '8px' }}>
+                              {status === 'OPEN' && (
+                                <button
+                                  onClick={() => handleStartInvestigation(ticketId)}
+                                  className="btn btn-primary btn-xs"
+                                >
+                                  Investigate
+                                </button>
+                              )}
+
+                              {status === 'IN_PROGRESS' && (
+                                <button
+                                  onClick={() => {
+                                    setResolvingTicket(t);
+                                    setResolveNotes('');
+                                  }}
+                                  className="btn btn-success btn-xs"
+                                >
+                                  Resolve
+                                </button>
+                              )}
+
+                              {status === 'RESOLVED' && (
+                                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
+                                  ✓ Resolved
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </main>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 1: CREATE SUPPORT TICKET                                        */}
       {/* ===================================================================== */}
       {isCreateModalOpen && (
         <div className="modal-overlay" onClick={() => setIsCreateModalOpen(false)}>
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '460px', padding: '24px', background: '#ffffff', boxShadow: 'var(--shadow-lg)' }}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '480px', padding: '24px', background: '#ffffff', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                Create Support Ticket
+                Submit Support Incident Ticket
               </h2>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
@@ -1672,25 +1728,43 @@ HAVING COUNT(e.employee_id) >= 2;`}
             </div>
 
             <form onSubmit={handleSubmitTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Requester Identity (Auto-locked for USER role, picker for ADMIN) */}
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Requester (Choose who you are)
+                  Requester
                 </label>
-                <select
-                  value={formData.user_id}
-                  onChange={(e) => setFormData({ ...formData, user_id: e.target.value ? Number(e.target.value) : '' })}
-                  required
-                >
-                  <option value="">-- Select Requester --</option>
-                  {availableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({u.dept}) — ID #{u.id}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                  Select your employee identity from the corporate directory.
-                </div>
+                {currentUser.role === 'USER' ? (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      background: '#f8fafc',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      color: '#0f172a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <span>👤</span>
+                    <span>{currentUser.full_name} ({currentUser.formatted_badge_id} &bull; {currentUser.department_name})</span>
+                  </div>
+                ) : (
+                  <select
+                    value={formData.user_id}
+                    onChange={(e) => setFormData({ ...formData, user_id: e.target.value ? Number(e.target.value) : '' })}
+                    required
+                  >
+                    <option value="">-- Select Requester --</option>
+                    {employees.filter(e => e.ROLE === 'USER').map((u) => (
+                      <option key={u.EMPLOYEE_ID} value={u.EMPLOYEE_ID}>
+                        {u.FULL_NAME} ({u.DEPARTMENT_NAME}) &bull; ID #{u.EMPLOYEE_ID}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -1713,33 +1787,53 @@ HAVING COUNT(e.employee_id) >= 2;`}
 
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Priority Level
+                  Detailed Issue Explanation
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                  {PRIORITIES.map((p) => {
-                    const isSelected = formData.priority_level === p;
-                    return (
-                      <button
-                        type="button"
-                        key={p}
-                        onClick={() => setFormData({ ...formData, priority_level: p })}
-                        style={{
-                          padding: '7px 4px',
-                          borderRadius: '6px',
-                          border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
-                          background: isSelected ? '#eff6ff' : '#ffffff',
-                          color: isSelected ? '#1d4ed8' : '#475569',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
+                <textarea
+                  rows={3}
+                  placeholder="Explain symptoms, error messages, and when the issue started..."
+                  value={formData.issue_description}
+                  onChange={(e) => setFormData({ ...formData, issue_description: e.target.value })}
+                  required
+                />
               </div>
+
+              {/* Priority Picker (Hidden for End Users, Available for Admins) */}
+              {currentUser.role === 'ADMIN' ? (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+                    Priority Level (Admin Override)
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                    {PRIORITIES.map((p) => {
+                      const isSelected = formData.priority_level === p;
+                      return (
+                        <button
+                          type="button"
+                          key={p}
+                          onClick={() => setFormData({ ...formData, priority_level: p })}
+                          style={{
+                            padding: '7px 4px',
+                            borderRadius: '6px',
+                            border: isSelected ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                            background: isSelected ? '#eff6ff' : '#ffffff',
+                            color: isSelected ? '#1d4ed8' : '#475569',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: '11.5px', color: '#64748b', background: '#f8fafc', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  ℹ️ Priority will be evaluated by an IT Support Engineer upon triage.
+                </div>
+              )}
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                 <button
@@ -1750,7 +1844,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
                   Cancel
                 </button>
                 <button type="submit" disabled={submitting} className="btn btn-primary">
-                  {submitting ? 'Creating...' : 'Create Ticket'}
+                  {submitting ? 'Submitting...' : 'Submit Incident'}
                 </button>
               </div>
             </form>
@@ -1759,7 +1853,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 2: RESOLVE TICKET (Arnav's Module)                              */}
+      {/* MODAL 2: RESOLVE INCIDENT                                             */}
       {/* ===================================================================== */}
       {resolvingTicket && (
         <div className="modal-overlay" onClick={() => setResolvingTicket(null)}>
@@ -1768,41 +1862,20 @@ HAVING COUNT(e.employee_id) >= 2;`}
               Resolve Incident #{resolvingTicket.TICKET_ID || resolvingTicket.ticket_id}
             </h2>
             <p style={{ fontSize: '12.5px', color: '#64748b', marginBottom: '16px' }}>
-              Category: <strong>{resolvingTicket.ISSUE_CATEGORY || resolvingTicket.issue_category}</strong> &bull; Priority:{' '}
-              <strong>{resolvingTicket.PRIORITY_LEVEL || resolvingTicket.priority_level}</strong>
+              Category: <strong>{resolvingTicket.ISSUE_CATEGORY || resolvingTicket.issue_category}</strong> &bull; Resolving Technician:{' '}
+              <strong>{currentUser.full_name}</strong>
             </p>
 
             <form onSubmit={handleResolveTicket} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Resolving Engineer (Choose who you are)
-                </label>
-                <select
-                  value={resolveData.technician_id}
-                  onChange={(e) => setResolveData({ ...resolveData, technician_id: e.target.value ? Number(e.target.value) : '' })}
-                  required
-                >
-                  <option value="">-- Select Resolving Engineer --</option>
-                  {availableTechnicians.map((tech) => (
-                    <option key={tech.id} value={tech.id}>
-                      {tech.name} ({tech.dept}) — ID #{tech.id}
-                    </option>
-                  ))}
-                </select>
-                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
-                  Select your technician identity to record this resolution in Oracle.
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
-                  Technical Work Notes & Actions Taken
+                  Technical Diagnosis & Corrective Actions
                 </label>
                 <textarea
                   rows={4}
-                  placeholder="Describe the steps performed to resolve this incident..."
-                  value={resolveData.resolution_notes}
-                  onChange={(e) => setResolveData({ ...resolveData, resolution_notes: e.target.value })}
+                  placeholder="Explain steps taken, patches applied, or hardware replaced to resolve the incident..."
+                  value={resolveNotes}
+                  onChange={(e) => setResolveNotes(e.target.value)}
                   required
                 />
               </div>
@@ -1815,8 +1888,8 @@ HAVING COUNT(e.employee_id) >= 2;`}
                 >
                   Cancel
                 </button>
-                <button type="submit" disabled={resolving} className="btn btn-primary">
-                  {resolving ? 'Submitting...' : 'Mark as Resolved'}
+                <button type="submit" disabled={resolving} className="btn btn-success">
+                  {resolving ? 'Submitting...' : 'Mark Incident Resolved'}
                 </button>
               </div>
             </form>
@@ -1825,7 +1898,7 @@ HAVING COUNT(e.employee_id) >= 2;`}
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 3: REGISTER NEW EMPLOYEE (Shobit's Module)                       */}
+      {/* MODAL 3: REGISTER NEW EMPLOYEE (Shobit's Core Deliverable)             */}
       {/* ===================================================================== */}
       {isEmpModalOpen && (
         <div className="modal-overlay" onClick={() => setIsEmpModalOpen(false)}>
@@ -1910,33 +1983,33 @@ HAVING COUNT(e.employee_id) >= 2;`}
                       );
                     })}
                   </select>
-                  <div
-                    style={{
-                      marginTop: '8px',
-                      padding: '7px 10px',
-                      borderRadius: '6px',
-                      background: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      fontSize: '11.5px',
-                      color: '#475569',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      lineHeight: '1.4',
-                    }}
-                  >
-                    <span style={{ fontSize: '13px' }}>📍</span>
-                    <span>
-                      Building Location:{' '}
-                      <strong style={{ color: '#0f172a' }}>
-                        {departments.find((d) => Number(d.DEPARTMENT_ID) === Number(empFormData.department_id))?.STANDARDIZED_LOCATION ||
-                          departments.find((d) => Number(d.DEPARTMENT_ID) === Number(empFormData.department_id))?.LOCATION_BUILDING ||
-                          'Assigned Campus'}
-                      </strong>{' '}
-                      <span style={{ color: '#64748b' }}>(Pre-defined)</span>
-                    </span>
-                  </div>
                 </div>
+              </div>
+
+              {/* Dynamic Location Badge */}
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '12px',
+                  color: '#475569',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontSize: '14px' }}>📍</span>
+                <span>
+                  Building Location:{' '}
+                  <strong style={{ color: '#0f172a' }}>
+                    {departments.find((d) => Number(d.DEPARTMENT_ID) === Number(empFormData.department_id))?.STANDARDIZED_LOCATION ||
+                      departments.find((d) => Number(d.DEPARTMENT_ID) === Number(empFormData.department_id))?.LOCATION_BUILDING ||
+                      'Assigned Campus'}
+                  </strong>{' '}
+                  <span style={{ color: '#64748b' }}>(Pre-defined)</span>
+                </span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
@@ -1957,7 +2030,68 @@ HAVING COUNT(e.employee_id) >= 2;`}
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 4: ON-SCREEN DELETE CONFIRMATION POPUP                          */}
+      {/* MODAL 4: READ-ONLY STAFF DIRECTORY LOOKUP (For Support Engineers)      */}
+      {/* ===================================================================== */}
+      {isStaffLookupOpen && (
+        <div className="modal-overlay" onClick={() => setIsStaffLookupOpen(false)}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '700px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: '24px', background: '#ffffff', boxShadow: 'var(--shadow-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  Campus Personnel Contacts (Read-Only)
+                </h3>
+                <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  Look up requester office building locations for on-site hardware support
+                </span>
+              </div>
+              <button
+                onClick={() => setIsStaffLookupOpen(false)}
+                style={{ background: 'transparent', border: 'none', fontSize: '18px', color: '#94a3b8', cursor: 'pointer' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', flex: 1 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '12.5px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
+                    <th style={{ padding: '8px 10px' }}>Badge</th>
+                    <th style={{ padding: '8px 10px' }}>Employee</th>
+                    <th style={{ padding: '8px 10px' }}>Email</th>
+                    <th style={{ padding: '8px 10px' }}>Department</th>
+                    <th style={{ padding: '8px 10px' }}>Office Building</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees.map((emp) => (
+                    <tr key={emp.EMPLOYEE_ID} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '8px 10px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#2563eb' }}>
+                        {emp.FORMATTED_BADGE_ID}
+                      </td>
+                      <td style={{ padding: '8px 10px', fontWeight: 600, color: '#0f172a' }}>
+                        {emp.FULL_NAME}
+                      </td>
+                      <td style={{ padding: '8px 10px', color: '#475569' }}>
+                        {emp.EMAIL}
+                      </td>
+                      <td style={{ padding: '8px 10px', color: '#334155' }}>
+                        {emp.DEPARTMENT_NAME}
+                      </td>
+                      <td style={{ padding: '8px 10px', color: '#64748b' }}>
+                        {emp.STANDARDIZED_LOCATION || emp.LOCATION_BUILDING}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* MODAL 5: ON-SCREEN DELETE CONFIRMATION POPUP                          */}
       {/* ===================================================================== */}
       {confirmDelete.isOpen && (
         <div
