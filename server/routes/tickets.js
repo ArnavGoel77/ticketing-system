@@ -106,7 +106,7 @@ router.get('/metrics', async (req, res) => {
 
 
 // ============================================================================
-// 2. GET /api/tickets (Fetch All Tickets with Reporter & Resolution Data)
+// 2. GET /api/tickets (Fetch All Tickets with Reporter, Assignee & Resolution Data)
 // ============================================================================
 router.get('/', async (req, res) => {
     try {
@@ -117,16 +117,24 @@ router.get('/', async (req, res) => {
                 NVL(e.full_name, 'User #' || t.user_id) AS reporter_name,
                 NVL(e.email, 'N/A') AS reporter_email,
                 t.issue_category,
+                t.issue_description,
                 t.priority_level,
                 t.status,
                 TO_CHAR(t.created_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_created_at,
                 TO_CHAR(t.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at_iso,
+                t.assigned_to,
+                assignee.full_name AS assigned_engineer_name,
+                assignee.email AS assigned_engineer_email,
+                assignee_dept.department_name AS assigned_engineer_dept,
+                assignee_dept.location_building AS assigned_engineer_location,
                 r.resolution_id,
                 NVL(r.resolution_notes, 'Pending Assignment / Active Triage') AS resolution_notes,
                 TO_CHAR(r.resolved_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_resolved_at,
                 tech.full_name AS technician_name
             FROM TICKETS t
             LEFT OUTER JOIN EMPLOYEES e ON t.user_id = e.employee_id
+            LEFT OUTER JOIN EMPLOYEES assignee ON t.assigned_to = assignee.employee_id
+            LEFT OUTER JOIN DEPARTMENTS assignee_dept ON assignee.department_id = assignee_dept.department_id
             LEFT OUTER JOIN TICKET_RESOLUTIONS r ON t.ticket_id = r.ticket_id
             LEFT OUTER JOIN EMPLOYEES tech ON r.technician_id = tech.employee_id
             ORDER BY t.ticket_id DESC
@@ -154,15 +162,23 @@ router.get('/:id', async (req, res) => {
                 NVL(e.full_name, 'User #' || t.user_id) AS reporter_name,
                 NVL(e.email, 'N/A') AS reporter_email,
                 t.issue_category,
+                t.issue_description,
                 t.priority_level,
                 t.status,
                 TO_CHAR(t.created_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_created_at,
+                t.assigned_to,
+                assignee.full_name AS assigned_engineer_name,
+                assignee.email AS assigned_engineer_email,
+                assignee_dept.department_name AS assigned_engineer_dept,
+                assignee_dept.location_building AS assigned_engineer_location,
                 r.resolution_id,
                 r.resolution_notes,
                 TO_CHAR(r.resolved_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_resolved_at,
                 tech.full_name AS technician_name
             FROM TICKETS t
             LEFT OUTER JOIN EMPLOYEES e ON t.user_id = e.employee_id
+            LEFT OUTER JOIN EMPLOYEES assignee ON t.assigned_to = assignee.employee_id
+            LEFT OUTER JOIN DEPARTMENTS assignee_dept ON assignee.department_id = assignee_dept.department_id
             LEFT OUTER JOIN TICKET_RESOLUTIONS r ON t.ticket_id = r.ticket_id
             LEFT OUTER JOIN EMPLOYEES tech ON r.technician_id = tech.employee_id
             WHERE t.ticket_id = :id
@@ -185,7 +201,7 @@ router.get('/:id', async (req, res) => {
 // 4. POST /api/tickets (Create a New Incident Ticket)
 // ============================================================================
 router.post('/', async (req, res) => {
-    const { user_id, issue_category, priority_level } = req.body;
+    const { user_id, issue_category, issue_description, priority_level } = req.body;
 
     if (!user_id || !issue_category) {
         return sendResponse(res, 400, false, null, 'user_id and issue_category are required fields.');
@@ -203,21 +219,25 @@ router.post('/', async (req, res) => {
         return sendResponse(res, 400, false, null, `Invalid category. Must be one of: ${validCategories.join(', ')}`);
     }
 
+    const description = issue_description ? String(issue_description).trim() : 'General technical support request';
+
     try {
         const sql = `
-            INSERT INTO TICKETS (user_id, issue_category, priority_level, status)
-            VALUES (:user_id, :issue_category, :priority_level, 'OPEN')
-            RETURNING ticket_id, user_id, issue_category, priority_level, status, TO_CHAR(created_at, 'DD-Mon-YYYY HH24:MI:SS')
-            INTO :out_id, :out_user, :out_category, :out_priority, :out_status, :out_created
+            INSERT INTO TICKETS (user_id, issue_category, issue_description, priority_level, status)
+            VALUES (:user_id, :issue_category, :issue_description, :priority_level, 'OPEN')
+            RETURNING ticket_id, user_id, issue_category, issue_description, priority_level, status, TO_CHAR(created_at, 'DD-Mon-YYYY HH24:MI:SS')
+            INTO :out_id, :out_user, :out_category, :out_desc, :out_priority, :out_status, :out_created
         `;
 
         const binds = {
             user_id: Number(user_id),
             issue_category: category,
+            issue_description: description,
             priority_level: priority,
             out_id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
             out_user: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
             out_category: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 50 },
+            out_desc: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 1000 },
             out_priority: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 20 },
             out_status: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 20 },
             out_created: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 50 }
@@ -228,6 +248,7 @@ router.post('/', async (req, res) => {
             ticket_id: result.outBinds.out_id[0],
             user_id: result.outBinds.out_user[0],
             issue_category: result.outBinds.out_category[0],
+            issue_description: result.outBinds.out_desc[0],
             priority_level: result.outBinds.out_priority[0],
             status: result.outBinds.out_status[0],
             formatted_created_at: result.outBinds.out_created[0]
@@ -242,14 +263,14 @@ router.post('/', async (req, res) => {
 
 
 // ============================================================================
-// 5. PUT /api/tickets/:id (Update Ticket Status or Priority)
+// 5. PUT /api/tickets/:id (Update Ticket Status, Priority, or Assigned Engineer)
 // ============================================================================
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { status, priority_level } = req.body;
+    const { status, priority_level, assigned_to } = req.body;
 
-    if (!status && !priority_level) {
-        return sendResponse(res, 400, false, null, 'Provide status or priority_level to update.');
+    if (!status && !priority_level && assigned_to === undefined) {
+        return sendResponse(res, 400, false, null, 'Provide status, priority_level, or assigned_to to update.');
     }
 
     const updates = [];
@@ -273,6 +294,11 @@ router.put('/:id', async (req, res) => {
         }
         updates.push(`priority_level = :priority_level`);
         binds.priority_level = normalizedPriority;
+    }
+
+    if (assigned_to !== undefined) {
+        updates.push(`assigned_to = :assigned_to`);
+        binds.assigned_to = assigned_to ? Number(assigned_to) : null;
     }
 
     try {
@@ -328,6 +354,38 @@ router.post('/:id/resolve', async (req, res) => {
     }
 
     try {
+        // Step 0: Check ticket existence, current assignment, and technician role
+        const checkSql = `
+            SELECT t.status, t.assigned_to, e.full_name AS assigned_engineer_name, tech.role AS technician_role
+            FROM TICKETS t
+            LEFT OUTER JOIN EMPLOYEES e ON t.assigned_to = e.employee_id
+            LEFT OUTER JOIN EMPLOYEES tech ON tech.employee_id = :technician_id
+            WHERE t.ticket_id = :id
+        `;
+        const checkResult = await executeQuery(checkSql, {
+            id: Number(id),
+            technician_id: Number(technician_id)
+        });
+
+        if (!checkResult.rows || checkResult.rows.length === 0) {
+            return sendResponse(res, 404, false, null, `Ticket #${id} not found.`);
+        }
+
+        const ticket = checkResult.rows[0];
+        const assignedTo = ticket.ASSIGNED_TO;
+        const technicianRole = ticket.TECHNICIAN_ROLE;
+
+        // If ticket is assigned to a different engineer, only an ADMIN can resolve it
+        if (assignedTo && Number(assignedTo) !== Number(technician_id) && technicianRole !== 'ADMIN') {
+            return sendResponse(
+                res,
+                403,
+                false,
+                null,
+                `Cannot resolve ticket: Ticket #${id} is currently under investigation by ${ticket.ASSIGNED_ENGINEER_NAME || 'another engineer'}. Only the assigned investigating engineer (or an administrator) can resolve it.`
+            );
+        }
+
         // Step 1: Insert into TICKET_RESOLUTIONS
         const insertResolutionSql = `
             INSERT INTO TICKET_RESOLUTIONS (ticket_id, technician_id, resolution_notes)
@@ -339,13 +397,14 @@ router.post('/:id/resolve', async (req, res) => {
             resolution_notes: resolution_notes.trim()
         });
 
-        // Step 2: Mark ticket as RESOLVED
+        // Step 2: Mark ticket as RESOLVED and ensure assigned_to is set
         const updateTicketSql = `
             UPDATE TICKETS 
-            SET status = 'RESOLVED' 
+            SET status = 'RESOLVED',
+                assigned_to = NVL(assigned_to, :technician_id)
             WHERE ticket_id = :id
         `;
-        await executeQuery(updateTicketSql, { id: Number(id) });
+        await executeQuery(updateTicketSql, { id: Number(id), technician_id: Number(technician_id) });
 
         return sendResponse(res, 200, true, { ticket_id: Number(id), technician_id }, `Ticket #${id} resolved successfully.`);
     } catch (err) {

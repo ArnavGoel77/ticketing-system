@@ -10,10 +10,25 @@ const CATEGORIES = [
   { id: 'EMAIL', label: 'Email & Communications' },
 ];
 
+const CATEGORY_ICONS = {
+  NETWORK: '🌐',
+  HARDWARE: '💻',
+  SOFTWARE: '⚙️',
+  ACCOUNT_ACCESS: '🔑',
+  EMAIL: '📧',
+  GENERAL: '❓'
+};
+
+const getCategoryIcon = (category) => {
+  if (!category) return '📋';
+  const key = String(category).toUpperCase();
+  return CATEGORY_ICONS[key] || '📋';
+};
+
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
 export default function App() {
-  // Session Authentication State (Task S2)
+  // Session Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('currentUser');
@@ -23,7 +38,7 @@ export default function App() {
     }
   });
 
-  // Dedicated Route State (Task S2 & S3: /login, /admin, /user, /engineer)
+  // Dedicated Route State (/login, /admin, /user, /engineer)
   const getRouteFromPath = () => {
     const p = window.location.pathname.toLowerCase();
     if (p.includes('/admin')) return '/admin';
@@ -54,7 +69,11 @@ export default function App() {
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
 
-  // Employees Filter States (Shobit's Module)
+  // User Portal Filter States
+  const [userStatusFilter, setUserStatusFilter] = useState('ALL');
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
+  // Employees Filter States
   const [empSearch, setEmpSearch] = useState('');
   const [empRoleFilter, setEmpRoleFilter] = useState('ALL');
   const [empDeptFilter, setEmpDeptFilter] = useState('ALL');
@@ -78,7 +97,12 @@ export default function App() {
   const [resolveNotes, setResolveNotes] = useState('');
   const [resolving, setResolving] = useState(false);
 
-  // Register Employee Form State (Shobit's Module)
+  // Investigation Details Popup State
+  const [investigatingTicket, setInvestigatingTicket] = useState(null);
+  const [investigationPriority, setInvestigationPriority] = useState('MEDIUM');
+  const [investigating, setInvestigating] = useState(false);
+
+  // Register Employee Form State
   const [empFormData, setEmpFormData] = useState({
     full_name: '',
     email: '',
@@ -261,24 +285,37 @@ export default function App() {
     }
   };
 
-  // Support Engineer Investigation Action
-  const handleStartInvestigation = async (ticketId) => {
+  // Open Investigation Brief Modal (Popup with details, description, requester)
+  const openInvestigationModal = (ticket) => {
+    setInvestigatingTicket(ticket);
+    setInvestigationPriority(ticket.PRIORITY_LEVEL || ticket.priority_level || 'MEDIUM');
+  };
+
+  // Confirm Investigation Action (Assigns to current engineer and flips to IN_PROGRESS)
+  const handleConfirmInvestigation = async () => {
+    if (!investigatingTicket) return;
+    const ticketId = investigatingTicket.TICKET_ID || investigatingTicket.ticket_id;
+    setInvestigating(true);
     try {
       const res = await fetch(`/api/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'IN_PROGRESS',
-          assigned_to: currentUser.employee_id
+          assigned_to: currentUser.employee_id,
+          priority_level: investigationPriority
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Investigation update failed');
 
       showToast(`Assigned Ticket #${ticketId} to ${currentUser.full_name}. Status moved to IN_PROGRESS.`, 'success');
+      setInvestigatingTicket(null);
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
+    } finally {
+      setInvestigating(false);
     }
   };
 
@@ -300,13 +337,20 @@ export default function App() {
     }
   };
 
-  // Submit Resolution
+  // Submit Resolution (Only assigned investigating engineer or Admin can resolve)
   const handleResolveTicket = async (e) => {
     e.preventDefault();
     if (!resolveNotes.trim()) {
       showToast('Please enter technical resolution diagnosis notes.', 'danger');
       return;
     }
+
+    const ticketAssignedTo = resolvingTicket.ASSIGNED_TO || resolvingTicket.assigned_to;
+    if (ticketAssignedTo && Number(ticketAssignedTo) !== Number(currentUser.employee_id) && currentUser.role !== 'ADMIN') {
+      showToast('Only the assigned investigating engineer (or an administrator) can resolve this ticket.', 'danger');
+      return;
+    }
+
     setResolving(true);
     try {
       const ticketId = resolvingTicket.TICKET_ID || resolvingTicket.ticket_id;
@@ -319,7 +363,7 @@ export default function App() {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.message);
+      if (!res.ok || !data.success) throw new Error(data.message || 'Resolution failed');
 
       showToast(`Ticket #${ticketId} resolved successfully.`, 'success');
       setResolvingTicket(null);
@@ -347,10 +391,10 @@ export default function App() {
   };
 
   // ============================================================================
-  // SHOBIT'S MODULE HANDLERS (Identity & Organization)
+  // PERSONNEL & ORG HANDLERS
   // ============================================================================
 
-  // Register Employee (Task S1 & S3)
+  // Register Employee
   const handleRegisterEmployee = async (e) => {
     e.preventDefault();
     if (!empFormData.full_name.trim() || !empFormData.email.trim()) {
@@ -391,7 +435,7 @@ export default function App() {
     }
   };
 
-  // Delete Employee (Shobit's Module: Task S1 & S3 with FK Handling)
+  // Delete Employee (FK Handling)
   const executeDeleteEmployee = async (empId, empName) => {
     try {
       const res = await fetch(`/api/employees/${empId}`, { method: 'DELETE' });
@@ -408,16 +452,18 @@ export default function App() {
     }
   };
 
-  // Filtered Tickets
+  // Filtered Tickets (Support search across ID, requester, category, and issue description)
   const filteredTickets = tickets.filter((t) => {
     const id = String(t.TICKET_ID || t.ticket_id || '');
     const reporter = String(t.REPORTER_NAME || t.reporter_name || '').toLowerCase();
     const cat = String(t.ISSUE_CATEGORY || t.issue_category || '').toUpperCase();
+    const desc = String(t.ISSUE_DESCRIPTION || t.issue_description || '').toLowerCase();
     const status = String(t.STATUS || t.status || '').toUpperCase();
     const priority = String(t.PRIORITY_LEVEL || t.priority_level || '').toUpperCase();
 
+    const query = search.toLowerCase();
     const matchesSearch =
-      id.includes(search) || reporter.includes(search.toLowerCase()) || cat.toLowerCase().includes(search.toLowerCase());
+      !search || id.includes(query) || reporter.includes(query) || cat.toLowerCase().includes(query) || desc.includes(query);
     const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
     const matchesPriority = priorityFilter === 'ALL' || priority === priorityFilter;
     const matchesCategory = categoryFilter === 'ALL' || cat === categoryFilter;
@@ -425,7 +471,7 @@ export default function App() {
     return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
   });
 
-  // Filtered Employees (Shobit's Module)
+  // Filtered Employees
   const filteredEmployees = employees.filter((emp) => {
     const name = String(emp.FULL_NAME || '').toLowerCase();
     const email = String(emp.EMAIL || '').toLowerCase();
@@ -450,15 +496,15 @@ export default function App() {
   // AUTHENTICATED PORTAL SHELL (Header + Dynamic Views)
   // ============================================================================
   const roleTitleMap = {
-    ADMIN: 'System Administration & Governance',
-    TECHNICIAN: 'Support Engineer Incident Workbench',
-    USER: 'Employee Self-Service Portal'
+    ADMIN: 'Admin Console',
+    TECHNICIAN: 'Engineer Workbench',
+    USER: 'Support Portal'
   };
 
   const rolePillMap = {
     ADMIN: { label: '🛡️ System Admin', bg: '#f5f3ff', color: '#6d28d9', border: '#ede9fe' },
-    TECHNICIAN: { label: '🛠️ IT Technician', bg: '#fffbeb', color: '#b45309', border: '#fef3c7' },
-    USER: { label: '👤 Corporate User', bg: '#eff6ff', color: '#1d4ed8', border: '#dbeafe' }
+    TECHNICIAN: { label: '🛠️ Support Engineer', bg: '#fffbeb', color: '#b45309', border: '#fef3c7' },
+    USER: { label: '👤 Requester', bg: '#eff6ff', color: '#1d4ed8', border: '#dbeafe' }
   };
 
   const activePill = rolePillMap[currentUser.role] || rolePillMap.USER;
@@ -491,7 +537,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Persistent Global App Header (Task S3) */}
+      {/* Persistent Global App Header */}
       <header
         style={{
           background: '#ffffff',
@@ -535,7 +581,7 @@ export default function App() {
               </span>
             </div>
             <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-              Oracle Cloud Autonomous Database (26ai) &bull; Identity & Organization Scope
+              Oracle Autonomous Database 26ai (ATP)
             </div>
           </div>
         </div>
@@ -634,7 +680,7 @@ export default function App() {
       </header>
 
       {/* ===================================================================== */}
-      {/* VIEW 1: DEDICATED /admin VIEW (Task S3: Shobit's Core Deliverable)      */}
+      {/* VIEW 1: DEDICATED /admin VIEW (Admin Console)                         */}
       {/* ===================================================================== */}
       {currentRoute === '/admin' && (
         <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
@@ -666,7 +712,7 @@ export default function App() {
                   gap: '6px'
                 }}
               >
-                <span>🏢</span> Tab 1: Staff & Organization (Shobit)
+                <span>🏢</span> Staff & Organization
               </button>
 
               <button
@@ -685,7 +731,7 @@ export default function App() {
                   gap: '6px'
                 }}
               >
-                <span>🎫</span> Tab 2: Campus Incident Oversight
+                <span>🎫</span> Tickets
               </button>
 
               <button
@@ -704,7 +750,7 @@ export default function App() {
                   gap: '6px'
                 }}
               >
-                <span>🔬</span> Tab 3: Analytical SQL Lab
+                <span>🔬</span> Analytical SQL Lab
               </button>
             </div>
 
@@ -720,7 +766,7 @@ export default function App() {
             ) : null}
           </div>
 
-          {/* TAB 1: STAFF & ORGANIZATION MANAGEMENT (Shobit's Core Deliverable) */}
+          {/* TAB 1: STAFF & ORGANIZATION MANAGEMENT */}
           {adminActiveTab === 'organization' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Organization KPI Ribbon */}
@@ -773,7 +819,7 @@ export default function App() {
                     Campus Operational Divisions (`DEPARTMENTS`)
                   </h3>
                   <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-                    Oracle Relational Schema &bull; Shobit's Module
+                    Enterprise Personnel &amp; Division Directory
                   </span>
                 </div>
 
@@ -1161,11 +1207,11 @@ export default function App() {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
-                {/* Card 1: Shobit's Review 1 Query 2.1 */}
+                {/* Card 1: Query 2.1 */}
                 <div className="card" style={{ padding: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>
-                      Shobit's Query 2.1 &bull; HAVING Threshold
+                      Query 2.1 &bull; HAVING Threshold
                     </span>
                     <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Executed Live</span>
                   </div>
@@ -1194,11 +1240,11 @@ ORDER BY total_assigned_staff DESC;`}
                   </div>
                 </div>
 
-                {/* Card 2: Shobit's Query 2.2 */}
+                {/* Card 2: Query 2.2 */}
                 <div className="card" style={{ padding: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' }}>
-                      Shobit's Query 2.2 &bull; Role Distribution
+                      Query 2.2 &bull; Role Distribution
                     </span>
                     <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Executed Live</span>
                   </div>
@@ -1229,11 +1275,11 @@ ORDER BY total_staff_count DESC;`}
                   </div>
                 </div>
 
-                {/* Card 3: Shobit's Query 1.1, 1.2, 1.3 */}
+                {/* Card 3: Query 1.1, 1.2, 1.3 */}
                 <div className="card" style={{ padding: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669', textTransform: 'uppercase' }}>
-                      Shobit's Part 1 &bull; Single-Row Functions
+                      SQL Lab 1.0 &bull; Single-Row Functions
                     </span>
                     <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Active in Schema</span>
                   </div>
@@ -1301,413 +1347,771 @@ ORDER BY total_tickets_in_queue DESC;`}
       )}
 
       {/* ===================================================================== */}
-      {/* VIEW 2: DEDICATED /user VIEW (End-User Portal)                         */}
+      {/* VIEW 2: DEDICATED /user VIEW (Support Portal)                          */}
       {/* ===================================================================== */}
-      {currentRoute === '/user' && (
-        <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
-          {/* Welcome User Banner */}
-          <div
-            className="card"
-            style={{
-              padding: '24px 28px',
-              background: 'linear-gradient(135deg, #eff6ff 0%, #ffffff 100%)',
-              border: '1px solid #bfdbfe',
-              marginBottom: '24px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '16px'
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                End-User Self-Service Portal
-              </div>
-              <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '4px 0 6px 0' }}>
-                Welcome back, {currentUser.full_name}!
-              </h2>
-              <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
-                Department: <strong>{currentUser.department_name}</strong> &bull; Office:{' '}
-                <strong>{currentUser.location_building}</strong> &bull; Badge: <strong>{currentUser.formatted_badge_id}</strong>
-              </p>
-            </div>
+      {currentRoute === '/user' && (() => {
+        const myTickets = tickets.filter(t => (t.USER_ID || t.user_id) === currentUser.employee_id);
+        const myActiveCount = myTickets.filter(t => (t.STATUS || t.status) !== 'RESOLVED').length;
+        const myResolvedCount = myTickets.filter(t => (t.STATUS || t.status) === 'RESOLVED').length;
 
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="btn btn-primary"
-              style={{ padding: '10px 18px', fontSize: '14px', fontWeight: 600 }}
+        const filteredMyTickets = myTickets.filter(t => {
+          const status = (t.STATUS || t.status || '').toUpperCase();
+          const cat = (t.ISSUE_CATEGORY || t.issue_category || '').toLowerCase();
+          const desc = (t.ISSUE_DESCRIPTION || t.issue_description || '').toLowerCase();
+          const id = String(t.TICKET_ID || t.ticket_id || '');
+          const eng = (t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name || '').toLowerCase();
+          const query = userSearchTerm.toLowerCase();
+
+          const matchesSearch = !userSearchTerm || id.includes(query) || cat.includes(query) || desc.includes(query) || eng.includes(query);
+          if (!matchesSearch) return false;
+
+          if (userStatusFilter === 'ACTIVE') return status !== 'RESOLVED';
+          if (userStatusFilter === 'RESOLVED') return status === 'RESOLVED';
+          return true;
+        });
+
+        return (
+          <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+            {/* Page Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '22px',
+                flexWrap: 'wrap',
+                gap: '16px'
+              }}
             >
-              + Submit Support Ticket
-            </button>
-          </div>
-
-          {/* User's Submitted Tickets */}
-          <section className="card" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
               <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>
                   My Support Incidents
-                </h3>
-                <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>
-                  Tickets submitted by your account with live technician contact tracking
+                </h1>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Track service requests, communicate with investigating engineers, and monitor resolution progress
                 </p>
               </div>
-              <span style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600 }}>
-                {tickets.filter(t => (t.USER_ID || t.user_id) === currentUser.employee_id).length} Incident(s) Logged
-              </span>
-            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {tickets.filter(t => (t.USER_ID || t.user_id) === currentUser.employee_id).length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>📋</div>
-                  <div style={{ fontSize: '15px', fontWeight: 600, color: '#475569' }}>No support incidents found</div>
-                  <p style={{ fontSize: '13px', marginTop: '4px' }}>
-                    Need technical assistance? Click "+ Submit Support Ticket" above.
-                  </p>
-                </div>
-              ) : (
-                tickets
-                  .filter(t => (t.USER_ID || t.user_id) === currentUser.employee_id)
-                  .map((t) => {
-                    const ticketId = t.TICKET_ID || t.ticket_id;
-                    const cat = t.ISSUE_CATEGORY || t.issue_category;
-                    const priority = t.PRIORITY_LEVEL || t.priority_level;
-                    const status = t.STATUS || t.status;
-                    const date = t.FORMATTED_CREATED_AT || t.formatted_created_at || t.CREATED_AT || t.created_at;
-                    const desc = t.ISSUE_DESCRIPTION || t.issue_description || 'No detailed issue notes provided.';
-                    const engineerName = t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name;
-                    const engineerEmail = t.ASSIGNED_ENGINEER_EMAIL || t.assigned_engineer_email;
-                    const engineerDept = t.ASSIGNED_ENGINEER_DEPT || t.assigned_engineer_dept || 'IT Support';
-                    const engineerLoc = t.ASSIGNED_ENGINEER_LOCATION || t.assigned_engineer_location || 'Tech Park A';
-                    const resNotes = t.RESOLUTION_NOTES || t.resolution_notes;
-                    const resolvedAt = t.FORMATTED_RESOLVED_AT || t.formatted_resolved_at;
-
-                    return (
-                      <div
-                        key={ticketId}
-                        style={{
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '10px',
-                          padding: '18px 20px',
-                          background: '#ffffff'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
-                                #{ticketId}
-                              </span>
-                              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                                {cat}
-                              </span>
-                              <span className={`badge status-${String(status).toLowerCase()}`}>
-                                {String(status).replace('_', ' ')}
-                              </span>
-                            </div>
-                            <p style={{ fontSize: '13px', color: '#334155', margin: '8px 0 4px 0' }}>
-                              {desc}
-                            </p>
-                            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                              Reported on {date} &bull; Priority: <strong>{priority}</strong> (Evaluated by IT)
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Live Investigating Engineer Contact Card */}
-                        {(status === 'IN_PROGRESS' || status === 'RESOLVED') && (
-                          <div
-                            style={{
-                              marginTop: '14px',
-                              padding: '12px 14px',
-                              borderRadius: '8px',
-                              background: '#f8fafc',
-                              border: '1px solid #e2e8f0',
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              flexWrap: 'wrap',
-                              gap: '12px'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <span style={{ fontSize: '20px' }}>🔍</span>
-                              <div>
-                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase' }}>
-                                  Investigating Lead Engineer
-                                </div>
-                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
-                                  {engineerName || 'Vikram Malhotra'} ({engineerDept})
-                                </div>
-                              </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#475569' }}>
-                              <span>📧 {engineerEmail || 'vikram.malhotra@company.com'}</span>
-                              <span>🏢 {engineerLoc}</span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Resolution Summary if Resolved */}
-                        {status === 'RESOLVED' && resNotes && (
-                          <div
-                            style={{
-                              marginTop: '10px',
-                              padding: '10px 14px',
-                              borderRadius: '8px',
-                              background: '#f0fdf4',
-                              border: '1px solid #bbf7d0',
-                              color: '#166534',
-                              fontSize: '12.5px'
-                            }}
-                          >
-                            <strong>Resolution Diagnosis:</strong> {resNotes}
-                            {resolvedAt && <div style={{ fontSize: '11px', marginTop: '4px', opacity: 0.85 }}>Completed: {resolvedAt}</div>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-              )}
-            </div>
-          </section>
-        </main>
-      )}
-
-      {/* ===================================================================== */}
-      {/* VIEW 3: DEDICATED /engineer VIEW (Support Engineer Incident Workbench) */}
-      {/* ===================================================================== */}
-      {currentRoute === '/engineer' && (
-        <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
-          {/* Support Workbench Banner */}
-          <div
-            className="card"
-            style={{
-              padding: '20px 24px',
-              background: 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)',
-              border: '1px solid #fef3c7',
-              marginBottom: '22px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '14px'
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Technical Incident Dispatch & Triage
-              </div>
-              <h2 style={{ fontSize: '19px', fontWeight: 800, color: '#0f172a', margin: '4px 0 4px 0' }}>
-                Support Engineer: {currentUser.full_name}
-              </h2>
-              <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
-                {currentUser.formatted_badge_id} &bull; IT Support Division &bull; Assigned Location: {currentUser.location_building}
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setIsStaffLookupOpen(true)} className="btn btn-secondary">
-                📖 Staff Directory (Read-Only)
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="btn btn-primary"
+                style={{ padding: '10px 18px', fontSize: '13.5px', fontWeight: 600, borderRadius: '8px', boxShadow: '0 2px 6px rgba(37,99,235,0.25)' }}
+              >
+                <span style={{ fontSize: '16px', lineHeight: 1 }}>+</span> Submit New Ticket
               </button>
             </div>
-          </div>
 
-          {/* Workbench Grid: Left Category Sidebar + Right Incident Queue */}
-          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '22px', alignItems: 'start' }}>
-            {/* Category Filter Sidebar */}
-            <aside style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="card" style={{ padding: '16px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', marginBottom: '10px' }}>
-                  Incident Categories
+            {/* Quick Metrics Ribbon */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '22px' }}>
+              <div className="card metric-card">
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                  📋
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <button
-                    onClick={() => setCategoryFilter('ALL')}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '8px 10px',
-                      borderRadius: '6px',
-                      background: categoryFilter === 'ALL' ? '#eff6ff' : 'transparent',
-                      border: 'none',
-                      color: categoryFilter === 'ALL' ? '#2563eb' : '#475569',
-                      fontWeight: categoryFilter === 'ALL' ? 700 : 500,
-                      cursor: 'pointer',
-                      fontSize: '12.5px',
-                      textAlign: 'left'
-                    }}
-                  >
-                    <span>All Categories</span>
-                    <span>{tickets.length}</span>
-                  </button>
-
-                  {CATEGORIES.map((c) => {
-                    const count = tickets.filter(t => (t.ISSUE_CATEGORY || t.issue_category) === c.id).length;
-                    const isSelected = categoryFilter === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        onClick={() => setCategoryFilter(c.id)}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          padding: '8px 10px',
-                          borderRadius: '6px',
-                          background: isSelected ? '#eff6ff' : 'transparent',
-                          border: 'none',
-                          color: isSelected ? '#2563eb' : '#475569',
-                          fontWeight: isSelected ? 700 : 500,
-                          cursor: 'pointer',
-                          fontSize: '12.5px',
-                          textAlign: 'left'
-                        }}
-                      >
-                        <span>{c.label}</span>
-                        <span>{count}</span>
-                      </button>
-                    );
-                  })}
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Total Requests</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f172a' }}>{myTickets.length}</div>
                 </div>
               </div>
-            </aside>
 
-            {/* Engineer Triage Queue */}
-            <section className="card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div className="card metric-card">
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                  ⏳
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#b45309' }}>Active / In Progress</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#b45309' }}>{myActiveCount}</div>
+                </div>
+              </div>
+
+              <div className="card metric-card">
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
+                  ✓
+                </div>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: '#16a34a' }}>Resolved &amp; Closed</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#16a34a' }}>{myResolvedCount}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Tabs & Search Bar */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '18px',
+                flexWrap: 'wrap',
+                gap: '12px'
+              }}
+            >
+              {/* Segmented Filter Tabs */}
+              <div style={{ display: 'inline-flex', background: '#e2e8f0', padding: '3px', borderRadius: '8px', gap: '3px' }}>
+                <button
+                  onClick={() => setUserStatusFilter('ALL')}
+                  style={{
+                    background: userStatusFilter === 'ALL' ? '#ffffff' : 'transparent',
+                    color: userStatusFilter === 'ALL' ? '#0f172a' : '#64748b',
+                    fontWeight: userStatusFilter === 'ALL' ? 700 : 500,
+                    boxShadow: userStatusFilter === 'ALL' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  All ({myTickets.length})
+                </button>
+                <button
+                  onClick={() => setUserStatusFilter('ACTIVE')}
+                  style={{
+                    background: userStatusFilter === 'ACTIVE' ? '#ffffff' : 'transparent',
+                    color: userStatusFilter === 'ACTIVE' ? '#2563eb' : '#64748b',
+                    fontWeight: userStatusFilter === 'ACTIVE' ? 700 : 500,
+                    boxShadow: userStatusFilter === 'ACTIVE' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Active ({myActiveCount})
+                </button>
+                <button
+                  onClick={() => setUserStatusFilter('RESOLVED')}
+                  style={{
+                    background: userStatusFilter === 'RESOLVED' ? '#ffffff' : 'transparent',
+                    color: userStatusFilter === 'RESOLVED' ? '#16a34a' : '#64748b',
+                    fontWeight: userStatusFilter === 'RESOLVED' ? 700 : 500,
+                    boxShadow: userStatusFilter === 'RESOLVED' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                    border: 'none',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '12.5px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Resolved ({myResolvedCount})
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <div style={{ position: 'relative', width: '300px' }}>
                 <input
                   type="text"
-                  placeholder="Filter incident queue..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  style={{ width: '260px', fontSize: '12.5px', padding: '6px 10px' }}
+                  placeholder="Search incidents or keywords..."
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  style={{
+                    padding: '7px 12px 7px 32px',
+                    fontSize: '12.5px',
+                    borderRadius: '8px',
+                    border: '1px solid #cbd5e1'
+                  }}
                 />
+                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '13px', pointerEvents: 'none' }}>
+                  🔍
+                </span>
+              </div>
+            </div>
 
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px' }}
-                  >
-                    <option value="ALL">All Statuses</option>
-                    <option value="OPEN">OPEN</option>
-                    <option value="IN_PROGRESS">IN PROGRESS</option>
-                    <option value="RESOLVED">RESOLVED</option>
-                  </select>
+            {/* User Ticket Cards List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {filteredMyTickets.length === 0 ? (
+                <div className="card" style={{ textAlign: 'center', padding: '50px 20px', background: '#ffffff', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '36px', marginBottom: '8px' }}>📂</div>
+                  <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    No support incidents found
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: '0 auto 16px auto', maxWidth: '380px' }}>
+                    {userSearchTerm || userStatusFilter !== 'ALL'
+                      ? 'No incidents match your current search or status filter.'
+                      : 'You have not submitted any technical support incidents yet.'}
+                  </p>
+                  <button onClick={() => setIsCreateModalOpen(true)} className="btn btn-primary" style={{ padding: '8px 16px', borderRadius: '6px' }}>
+                    + Submit Your First Incident
+                  </button>
+                </div>
+              ) : (
+                filteredMyTickets.map((t) => {
+                  const ticketId = t.TICKET_ID || t.ticket_id;
+                  const cat = t.ISSUE_CATEGORY || t.issue_category;
+                  const priority = t.PRIORITY_LEVEL || t.priority_level;
+                  const status = t.STATUS || t.status;
+                  const date = t.FORMATTED_CREATED_AT || t.formatted_created_at || t.CREATED_AT || t.created_at;
+                  const desc = t.ISSUE_DESCRIPTION || t.issue_description || 'No detailed issue notes provided.';
+                  const engineerName = t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name;
+                  const engineerEmail = t.ASSIGNED_ENGINEER_EMAIL || t.assigned_engineer_email;
+                  const engineerDept = t.ASSIGNED_ENGINEER_DEPT || t.assigned_engineer_dept || 'IT Support';
+                  const engineerLoc = t.ASSIGNED_ENGINEER_LOCATION || t.assigned_engineer_location || 'Tech Park A';
+                  const resNotes = t.RESOLUTION_NOTES || t.resolution_notes;
+                  const resolvedAt = t.FORMATTED_RESOLVED_AT || t.formatted_resolved_at;
 
-                  <select
-                    value={priorityFilter}
-                    onChange={(e) => setPriorityFilter(e.target.value)}
-                    style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px' }}
-                  >
-                    <option value="ALL">All Priorities</option>
-                    <option value="LOW">LOW</option>
-                    <option value="MEDIUM">MEDIUM</option>
-                    <option value="HIGH">HIGH</option>
-                    <option value="CRITICAL">CRITICAL</option>
-                  </select>
+                  return (
+                    <div
+                      key={ticketId}
+                      className="card card-hover"
+                      style={{
+                        padding: '20px 24px',
+                        background: '#ffffff',
+                        borderRadius: '10px',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '14px'
+                      }}
+                    >
+                      {/* Top Row: ID, Category, Priority, Date, Status */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
+                            #{ticketId}
+                          </span>
+                          <span className="category-badge">
+                            <span>{getCategoryIcon(cat)}</span>
+                            <span>{cat}</span>
+                          </span>
+                          <span className={`priority-pill priority-pill-${String(priority).toLowerCase()}`}>
+                            {priority}
+                          </span>
+                          <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                            • Reported on {date}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className={`badge status-${String(status).toLowerCase()}`}>
+                            <span
+                              className={`status-dot ${
+                                status === 'OPEN'
+                                  ? 'status-dot-open'
+                                  : status === 'IN_PROGRESS'
+                                  ? 'status-dot-progress'
+                                  : 'status-dot-resolved'
+                              }`}
+                            />
+                            {String(status).replace('_', ' ')}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Middle: Issue Description Container */}
+                      <div
+                        style={{
+                          padding: '12px 16px',
+                          background: '#f8fafc',
+                          borderRadius: '8px',
+                          borderLeft: '3px solid #2563eb',
+                          fontSize: '13.5px',
+                          lineHeight: 1.6,
+                          color: '#1e293b'
+                        }}
+                      >
+                        {desc}
+                      </div>
+
+                      {/* Investigating Lead Engineer Contact Card */}
+                      {(status === 'IN_PROGRESS' || status === 'RESOLVED') && (
+                        <div
+                          style={{
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            background: '#f0fdf4',
+                            border: '1px solid #dcfce7',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: '12px'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div
+                              style={{
+                                width: '36px',
+                                height: '36px',
+                                borderRadius: '50%',
+                                background: '#16a34a',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 700,
+                                fontSize: '13px'
+                              }}
+                            >
+                              {(engineerName || 'Vikram Malhotra').split(' ').map(n => n[0]).join('')}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '11px', fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                Investigating Lead Engineer
+                              </div>
+                              <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#0f172a' }}>
+                                {engineerName || 'Vikram Malhotra'}
+                                <span style={{ fontWeight: 400, color: '#64748b', fontSize: '12px', marginLeft: '6px' }}>
+                                  ({engineerDept})
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '12.5px' }}>
+                            <span style={{ color: '#475569' }}>
+                              🏢 Office: <strong>{engineerLoc}</strong>
+                            </span>
+                            <a
+                              href={`mailto:${engineerEmail || 'support@company.com'}?subject=Inquiry on Ticket #${ticketId}`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: '#ffffff',
+                                border: '1px solid #bbf7d0',
+                                color: '#15803d',
+                                fontWeight: 600,
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                textDecoration: 'none',
+                                fontSize: '12px',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              ✉️ Contact Engineer
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Resolution Summary Box */}
+                      {status === 'RESOLVED' && resNotes && (
+                        <div
+                          style={{
+                            padding: '12px 16px',
+                            borderRadius: '8px',
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderLeft: '3px solid #16a34a',
+                            color: '#0f172a',
+                            fontSize: '13px',
+                            lineHeight: 1.5
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                            <span style={{ fontWeight: 700, color: '#16a34a', fontSize: '12px', textTransform: 'uppercase' }}>
+                              ✓ Official Resolution Diagnosis
+                            </span>
+                            {resolvedAt && (
+                              <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                Resolved on {resolvedAt}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ color: '#334155' }}>{resNotes}</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </main>
+        );
+      })()}
+
+      {/* ===================================================================== */}
+      {/* VIEW 3: DEDICATED /engineer VIEW (Engineer Workbench)                  */}
+      {/* ===================================================================== */}
+      {currentRoute === '/engineer' && (() => {
+        const engineerOpenCount = tickets.filter(t => (t.STATUS || t.status) === 'OPEN').length;
+        const engineerInProgressCount = tickets.filter(t => (t.STATUS || t.status) === 'IN_PROGRESS').length;
+        const engineerResolvedCount = tickets.filter(t => (t.STATUS || t.status) === 'RESOLVED').length;
+
+        return (
+          <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+            {/* Support Workbench Header */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '20px',
+                flexWrap: 'wrap',
+                gap: '16px'
+              }}
+            >
+              <div>
+                <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em', margin: 0 }}>
+                  Incident Triage &amp; Resolution Queue
+                </h1>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                  Technician: <strong>{currentUser.full_name}</strong> • Division: <strong>{currentUser.department_name || 'IT Support'}</strong> • Office: <strong>{currentUser.location_building}</strong>
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setIsStaffLookupOpen(true)} className="btn btn-secondary" style={{ borderRadius: '8px', fontSize: '13px' }}>
+                  📖 Staff Directory
+                </button>
+              </div>
+            </div>
+
+            {/* Operational KPIs Ribbon */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', marginBottom: '22px' }}>
+              <div className="card metric-card">
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                  ⚡
+                </div>
+                <div>
+                  <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#64748b' }}>Active Queue</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a' }}>{engineerOpenCount + engineerInProgressCount}</div>
                 </div>
               </div>
 
-              {/* Workbench Ticket List */}
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>ID</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Requester</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Category</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Engineer Criticality</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600 }}>Status</th>
-                      <th style={{ padding: '10px 12px', fontWeight: 600, textAlign: 'right' }}>Workbench Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTickets.map((t) => {
-                      const ticketId = t.TICKET_ID || t.ticket_id;
-                      const reporter = t.REPORTER_NAME || t.reporter_name || `User #${t.USER_ID || t.user_id}`;
-                      const cat = t.ISSUE_CATEGORY || t.issue_category;
-                      const priority = t.PRIORITY_LEVEL || t.priority_level;
-                      const status = t.STATUS || t.status;
+              <div className="card metric-card">
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                  🚨
+                </div>
+                <div>
+                  <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#b91c1c' }}>Awaiting Triage</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#b91c1c' }}>{engineerOpenCount}</div>
+                </div>
+              </div>
 
+              <div className="card metric-card">
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                  🔍
+                </div>
+                <div>
+                  <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#b45309' }}>In Investigation</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#b45309' }}>{engineerInProgressCount}</div>
+                </div>
+              </div>
+
+              <div className="card metric-card">
+                <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+                  ✓
+                </div>
+                <div>
+                  <div style={{ fontSize: '11.5px', fontWeight: 600, color: '#16a34a' }}>Resolved Total</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#16a34a' }}>{engineerResolvedCount}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Workbench Grid: Left Category Sidebar + Right Incident Queue */}
+            <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '22px', alignItems: 'start' }}>
+              {/* Category Filter Sidebar */}
+              <aside style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div className="card" style={{ padding: '16px', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px' }}>
+                    Incident Categories
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <button
+                      onClick={() => setCategoryFilter('ALL')}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        background: categoryFilter === 'ALL' ? '#eff6ff' : 'transparent',
+                        border: categoryFilter === 'ALL' ? '1px solid #bfdbfe' : '1px solid transparent',
+                        color: categoryFilter === 'ALL' ? '#2563eb' : '#475569',
+                        fontWeight: categoryFilter === 'ALL' ? 700 : 500,
+                        cursor: 'pointer',
+                        fontSize: '12.5px',
+                        textAlign: 'left'
+                      }}
+                    >
+                      <span>📁 All Categories</span>
+                      <span style={{ fontSize: '11px', background: categoryFilter === 'ALL' ? '#2563eb' : '#e2e8f0', color: categoryFilter === 'ALL' ? '#ffffff' : '#475569', padding: '2px 7px', borderRadius: '10px', fontWeight: 700 }}>
+                        {tickets.length}
+                      </span>
+                    </button>
+
+                    {CATEGORIES.map((c) => {
+                      const count = tickets.filter(t => (t.ISSUE_CATEGORY || t.issue_category) === c.id).length;
+                      const isSelected = categoryFilter === c.id;
                       return (
-                        <tr key={ticketId} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                          <td style={{ padding: '12px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#2563eb' }}>
-                            #{ticketId}
-                          </td>
-                          <td style={{ padding: '12px', fontWeight: 600, color: '#0f172a' }}>
-                            {reporter}
-                          </td>
-                          <td style={{ padding: '12px', color: '#475569' }}>
-                            {cat}
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            {/* Inline Criticality Selector (Evaluated by Engineer) */}
-                            <select
-                              value={priority}
-                              onChange={(e) => handleUpdatePriority(ticketId, e.target.value)}
-                              style={{
-                                width: '110px',
-                                padding: '4px 8px',
-                                fontSize: '11.5px',
-                                fontWeight: 700,
-                                borderRadius: '4px',
-                                border: '1px solid #cbd5e1'
-                              }}
-                            >
-                              {PRIORITIES.map((p) => (
-                                <option key={p} value={p}>{p}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            <span className={`badge status-${String(status).toLowerCase()}`}>
-                              {String(status).replace('_', ' ')}
-                            </span>
-                          </td>
-                          <td style={{ padding: '12px', textAlign: 'right' }}>
-                            <div style={{ display: 'inline-flex', gap: '8px' }}>
-                              {status === 'OPEN' && (
-                                <button
-                                  onClick={() => handleStartInvestigation(ticketId)}
-                                  className="btn btn-primary btn-xs"
-                                >
-                                  Investigate
-                                </button>
-                              )}
-
-                              {status === 'IN_PROGRESS' && (
-                                <button
-                                  onClick={() => {
-                                    setResolvingTicket(t);
-                                    setResolveNotes('');
-                                  }}
-                                  className="btn btn-success btn-xs"
-                                >
-                                  Resolve
-                                </button>
-                              )}
-
-                              {status === 'RESOLVED' && (
-                                <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>
-                                  ✓ Resolved
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                        <button
+                          key={c.id}
+                          onClick={() => setCategoryFilter(c.id)}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            background: isSelected ? '#eff6ff' : 'transparent',
+                            border: isSelected ? '1px solid #bfdbfe' : '1px solid transparent',
+                            color: isSelected ? '#2563eb' : '#475569',
+                            fontWeight: isSelected ? 700 : 500,
+                            cursor: 'pointer',
+                            fontSize: '12.5px',
+                            textAlign: 'left'
+                          }}
+                        >
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{getCategoryIcon(c.id)}</span>
+                            <span>{c.label}</span>
+                          </span>
+                          <span style={{ fontSize: '11px', background: isSelected ? '#2563eb' : '#e2e8f0', color: isSelected ? '#ffffff' : '#475569', padding: '2px 7px', borderRadius: '10px', fontWeight: 700 }}>
+                            {count}
+                          </span>
+                        </button>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          </div>
-        </main>
-      )}
+                  </div>
+                </div>
+              </aside>
+
+              {/* Engineer Triage Queue */}
+              <section className="card" style={{ padding: '20px', borderRadius: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ position: 'relative', width: '280px' }}>
+                    <input
+                      type="text"
+                      placeholder="Search queue by keyword, user, ID..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      style={{ padding: '7px 12px 7px 32px', fontSize: '12.5px', borderRadius: '8px' }}
+                    />
+                    <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '13px', pointerEvents: 'none' }}>
+                      🔍
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px', borderRadius: '8px' }}
+                    >
+                      <option value="ALL">All Statuses</option>
+                      <option value="OPEN">OPEN</option>
+                      <option value="IN_PROGRESS">IN PROGRESS</option>
+                      <option value="RESOLVED">RESOLVED</option>
+                    </select>
+
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value)}
+                      style={{ width: '130px', padding: '6px 10px', fontSize: '12.5px', borderRadius: '8px' }}
+                    >
+                      <option value="ALL">All Priorities</option>
+                      <option value="LOW">LOW</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="HIGH">HIGH</option>
+                      <option value="CRITICAL">CRITICAL</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Workbench Ticket List */}
+                <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', background: '#f8fafc' }}>
+                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>ID</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Requester</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Category</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Problem Description</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Criticality</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Lead Engineer</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Status</th>
+                        <th style={{ padding: '12px 14px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTickets.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: 'center', padding: '36px 16px', color: '#94a3b8' }}>
+                            No incidents found matching current filters.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTickets.map((t) => {
+                          const ticketId = t.TICKET_ID || t.ticket_id;
+                          const reporter = t.REPORTER_NAME || t.reporter_name || `User #${t.USER_ID || t.user_id}`;
+                          const cat = t.ISSUE_CATEGORY || t.issue_category;
+                          const priority = t.PRIORITY_LEVEL || t.priority_level;
+                          const status = t.STATUS || t.status;
+                          const desc = t.ISSUE_DESCRIPTION || t.issue_description || '—';
+                          const engineerName = t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name;
+                          const assignedTo = t.ASSIGNED_TO || t.assigned_to;
+                          const isAssignedToMe = assignedTo && Number(assignedTo) === Number(currentUser.employee_id);
+                          const canResolve = isAssignedToMe || currentUser.role === 'ADMIN';
+
+                          return (
+                            <tr key={ticketId} className="table-hover-row" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                              <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#2563eb', fontSize: '12.5px' }}>
+                                #{ticketId}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '13px' }}>{reporter}</div>
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <span className="category-badge">
+                                  <span>{getCategoryIcon(cat)}</span>
+                                  <span>{cat}</span>
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
+                                <div
+                                  onClick={() => openInvestigationModal(t)}
+                                  title="Click to view complete problem description"
+                                  style={{
+                                    color: '#334155',
+                                    fontSize: '12.5px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {desc}
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <select
+                                  value={priority}
+                                  onChange={(e) => handleUpdatePriority(ticketId, e.target.value)}
+                                  style={{
+                                    width: '100px',
+                                    padding: '4px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    borderRadius: '6px',
+                                    border: '1px solid #cbd5e1',
+                                    background:
+                                      priority === 'CRITICAL' ? '#fef2f2' :
+                                      priority === 'HIGH' ? '#fff7ed' :
+                                      priority === 'MEDIUM' ? '#eff6ff' : '#f8fafc',
+                                    color:
+                                      priority === 'CRITICAL' ? '#b91c1c' :
+                                      priority === 'HIGH' ? '#c2410c' :
+                                      priority === 'MEDIUM' ? '#2563eb' : '#475569',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  {PRIORITIES.map((p) => (
+                                    <option key={p} value={p}>{p}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td style={{ padding: '12px 14px', fontSize: '12px' }}>
+                                {engineerName ? (
+                                  <span style={{ fontWeight: 600, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    👨‍💻 {engineerName}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Unassigned</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <span className={`badge status-${String(status).toLowerCase()}`}>
+                                  <span
+                                    className={`status-dot ${
+                                      status === 'OPEN'
+                                        ? 'status-dot-open'
+                                        : status === 'IN_PROGRESS'
+                                        ? 'status-dot-progress'
+                                        : 'status-dot-resolved'
+                                    }`}
+                                  />
+                                  {String(status).replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
+                                  {status === 'OPEN' && (
+                                    <button
+                                      onClick={() => openInvestigationModal(t)}
+                                      className="btn btn-primary btn-xs"
+                                      style={{ fontWeight: 600, padding: '5px 11px', borderRadius: '6px' }}
+                                    >
+                                      🔍 Investigate
+                                    </button>
+                                  )}
+
+                                  {status === 'IN_PROGRESS' && (
+                                    canResolve ? (
+                                      <button
+                                        onClick={() => {
+                                          setResolvingTicket(t);
+                                          setResolveNotes('');
+                                        }}
+                                        className="btn btn-success btn-xs"
+                                        style={{ fontWeight: 600, padding: '5px 11px', borderRadius: '6px' }}
+                                      >
+                                        ✓ Resolve
+                                      </button>
+                                    ) : (
+                                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                        <span
+                                          style={{
+                                            fontSize: '11px',
+                                            color: '#64748b',
+                                            background: '#f1f5f9',
+                                            border: '1px solid #cbd5e1',
+                                            padding: '4px 8px',
+                                            borderRadius: '6px',
+                                            fontWeight: 600,
+                                            display: 'inline-flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                          }}
+                                          title={`Under investigation by ${engineerName || 'another engineer'}. Only they can resolve it.`}
+                                        >
+                                          🔒 Locked
+                                        </span>
+                                        <button
+                                          onClick={() => openInvestigationModal(t)}
+                                          className="btn btn-secondary btn-xs"
+                                          style={{ fontSize: '11px', padding: '4px 7px' }}
+                                          title="View ticket details"
+                                        >
+                                          Details
+                                        </button>
+                                      </div>
+                                    )
+                                  )}
+
+                                  {status === 'RESOLVED' && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                      <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 600, padding: '4px 6px' }}>
+                                        ✓ Done
+                                      </span>
+                                      <button
+                                        onClick={() => openInvestigationModal(t)}
+                                        className="btn btn-secondary btn-xs"
+                                        style={{ fontSize: '11px', padding: '4px 7px' }}
+                                        title="View resolution diagnosis and ticket details"
+                                      >
+                                        Details
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          </main>
+        );
+      })()}
 
       {/* ===================================================================== */}
       {/* MODAL 1: CREATE SUPPORT TICKET                                        */}
@@ -1853,6 +2257,263 @@ ORDER BY total_tickets_in_queue DESC;`}
       )}
 
       {/* ===================================================================== */}
+      {/* MODAL: INVESTIGATION BRIEF & ACTION                                   */}
+      {/* ===================================================================== */}
+      {investigatingTicket && (() => {
+        const ticketId = investigatingTicket.TICKET_ID || investigatingTicket.ticket_id;
+        const reporter = investigatingTicket.REPORTER_NAME || investigatingTicket.reporter_name || `User #${investigatingTicket.USER_ID || investigatingTicket.user_id}`;
+        const reporterEmail = investigatingTicket.REPORTER_EMAIL || investigatingTicket.reporter_email;
+        const cat = investigatingTicket.ISSUE_CATEGORY || investigatingTicket.issue_category;
+        const priority = investigatingTicket.PRIORITY_LEVEL || investigatingTicket.priority_level;
+        const status = investigatingTicket.STATUS || investigatingTicket.status;
+        const desc = investigatingTicket.ISSUE_DESCRIPTION || investigatingTicket.issue_description || 'No detailed issue notes provided.';
+        const date = investigatingTicket.FORMATTED_CREATED_AT || investigatingTicket.formatted_created_at || investigatingTicket.CREATED_AT || investigatingTicket.created_at;
+        const assignedTo = investigatingTicket.ASSIGNED_TO || investigatingTicket.assigned_to;
+        const engineerName = investigatingTicket.ASSIGNED_ENGINEER_NAME || investigatingTicket.assigned_engineer_name;
+        const isAssignedToMe = Number(assignedTo) === Number(currentUser.employee_id);
+        const canResolve = isAssignedToMe || currentUser.role === 'ADMIN';
+
+        return (
+          <div className="modal-overlay" onClick={() => setInvestigatingTicket(null)}>
+            <div
+              className="card"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '560px',
+                maxWidth: '92vw',
+                padding: '24px 28px',
+                background: '#ffffff',
+                boxShadow: 'var(--shadow-lg)',
+                borderRadius: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '18px'
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
+                      #{ticketId}
+                    </span>
+                    <span className="category-badge">
+                      <span>{getCategoryIcon(cat)}</span>
+                      <span>{cat}</span>
+                    </span>
+                    <span className={`badge status-${String(status).toLowerCase()}`}>
+                      <span
+                        className={`status-dot ${
+                          status === 'OPEN'
+                            ? 'status-dot-open'
+                            : status === 'IN_PROGRESS'
+                            ? 'status-dot-progress'
+                            : 'status-dot-resolved'
+                        }`}
+                      />
+                      {String(status).replace('_', ' ')}
+                    </span>
+                  </div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Incident Investigation Brief
+                  </h2>
+                </div>
+
+                <button
+                  onClick={() => setInvestigatingTicket(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    fontSize: '22px',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: '0 4px',
+                    lineHeight: 1
+                  }}
+                >
+                  &times;
+                </button>
+              </div>
+
+              {/* Requester Info Strip */}
+              <div
+                style={{
+                  padding: '12px 14px',
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '10px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    style={{
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '50%',
+                      background: '#eff6ff',
+                      color: '#2563eb',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px'
+                    }}
+                  >
+                    👤
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                      {reporter}
+                    </div>
+                    {reporterEmail && (
+                      <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                        {reporterEmail}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ fontSize: '12px', color: '#64748b', textAlign: 'right' }}>
+                  <div>Reported on:</div>
+                  <strong style={{ color: '#334155' }}>{date}</strong>
+                </div>
+              </div>
+
+              {/* Problem Description Container */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '6px' }}>
+                  Reported Problem Description
+                </label>
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderLeft: '4px solid #2563eb',
+                    borderRadius: '8px',
+                    fontSize: '13.5px',
+                    lineHeight: 1.6,
+                    color: '#0f172a'
+                  }}
+                >
+                  {desc}
+                </div>
+              </div>
+
+              {/* Triage Criticality Adjuster (when OPEN) or Status Info */}
+              {status === 'OPEN' ? (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: '6px' }}>
+                    Triage Criticality Level
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                    {PRIORITIES.map((p) => {
+                      const isSelected = investigationPriority === p;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setInvestigationPriority(p)}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '6px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            border: isSelected ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                            background: isSelected ? '#eff6ff' : '#ffffff',
+                            color: isSelected ? '#2563eb' : '#475569',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12.5px' }}>
+                  <span>Current Priority: <strong>{priority}</strong></span>
+                  <span>Assigned Lead: <strong>{engineerName || 'Unassigned'}</strong></span>
+                </div>
+              )}
+
+              {/* Investigator Action Callout */}
+              {status === 'OPEN' && (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    color: '#1e40af',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  <span style={{ fontSize: '20px' }}>👨‍💻</span>
+                  <div>
+                    <strong>Assigning Lead: {currentUser.full_name}</strong>
+                    <div style={{ fontSize: '11.5px', color: '#3b82f6', marginTop: '2px' }}>
+                      Status will change to IN_PROGRESS. Other technicians cannot resolve this ticket until released or completed.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Footer Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setInvestigatingTicket(null)}
+                  className="btn btn-secondary"
+                  style={{ padding: '8px 16px', borderRadius: '6px' }}
+                >
+                  Close
+                </button>
+
+                {status === 'OPEN' && (
+                  <button
+                    type="button"
+                    disabled={investigating}
+                    onClick={handleConfirmInvestigation}
+                    className="btn btn-primary"
+                    style={{ padding: '8px 18px', borderRadius: '6px', fontWeight: 600 }}
+                  >
+                    {investigating ? 'Assigning...' : '🚀 Begin Investigation'}
+                  </button>
+                )}
+
+                {status === 'IN_PROGRESS' && canResolve && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = investigatingTicket;
+                      setInvestigatingTicket(null);
+                      setResolvingTicket(t);
+                      setResolveNotes('');
+                    }}
+                    className="btn btn-success"
+                    style={{ padding: '8px 18px', borderRadius: '6px', fontWeight: 600 }}
+                  >
+                    ✓ Proceed to Resolve
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ===================================================================== */}
       {/* MODAL 2: RESOLVE INCIDENT                                             */}
       {/* ===================================================================== */}
       {resolvingTicket && (
@@ -1898,7 +2559,7 @@ ORDER BY total_tickets_in_queue DESC;`}
       )}
 
       {/* ===================================================================== */}
-      {/* MODAL 3: REGISTER NEW EMPLOYEE (Shobit's Core Deliverable)             */}
+      {/* MODAL 3: REGISTER NEW EMPLOYEE                                        */}
       {/* ===================================================================== */}
       {isEmpModalOpen && (
         <div className="modal-overlay" onClick={() => setIsEmpModalOpen(false)}>
