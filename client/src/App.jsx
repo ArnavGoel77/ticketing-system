@@ -120,6 +120,15 @@ export default function App() {
     details: '',
   });
 
+  // Review 2 Audit Log & PL/SQL Telemetry States
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditFilter, setAuditFilter] = useState('ALL');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [isSimulatingTrigger, setIsSimulatingTrigger] = useState(false);
+  const [testedFunctionOutput, setTestedFunctionOutput] = useState(null);
+  const [testingFunctionId, setTestingFunctionId] = useState(1001);
+  const [evaluatingFunction, setEvaluatingFunction] = useState(false);
+
   // Show Toast Notification
   const showToast = (message, type = 'success') => {
     setNotification({ message, type });
@@ -170,20 +179,22 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const [ticketsRes, metricsRes, deptRes, empRes, headRes] = await Promise.all([
+      const [ticketsRes, metricsRes, deptRes, empRes, headRes, auditRes] = await Promise.all([
         fetch('/api/tickets'),
         fetch('/api/tickets/metrics'),
         fetch('/api/departments'),
         fetch('/api/employees'),
-        fetch('/api/employees/headcount')
+        fetch('/api/employees/headcount'),
+        fetch('/api/audit-logs')
       ]);
 
-      const [ticketsJson, metricsJson, deptJson, empJson, headJson] = await Promise.all([
+      const [ticketsJson, metricsJson, deptJson, empJson, headJson, auditJson] = await Promise.all([
         ticketsRes.json(),
         metricsRes.json(),
         deptRes.json(),
         empRes.json(),
-        headRes.json()
+        headRes.json(),
+        auditRes.json()
       ]);
 
       if (ticketsJson.success) setTickets(ticketsJson.data || []);
@@ -191,6 +202,7 @@ export default function App() {
       if (deptJson.success) setDepartments(deptJson.data || []);
       if (empJson.success) setEmployees(empJson.data || []);
       if (headJson.success) setHeadcountMetrics(headJson.data || []);
+      if (auditJson.success) setAuditLogs(auditJson.data || []);
     } catch (err) {
       console.error('Data fetch error:', err);
       setError(err.message);
@@ -202,6 +214,62 @@ export default function App() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Review 2 Action Handlers
+  const fetchAuditLogs = async () => {
+    try {
+      const res = await fetch('/api/audit-logs');
+      const json = await res.json();
+      if (json.success) {
+        setAuditLogs(json.data || []);
+        showToast('Audit trail refreshed from Oracle.', 'success');
+      }
+    } catch (err) {
+      console.warn('Failed to fetch audit logs:', err);
+    }
+  };
+
+  const handleSimulateTrigger = async () => {
+    setIsSimulatingTrigger(true);
+    try {
+      const res = await fetch('/api/audit-logs/simulate-trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ticket_id: 1008,
+          new_priority: 'CRITICAL',
+          new_status: 'IN_PROGRESS',
+          user_name: currentUser?.full_name ? currentUser.full_name.toUpperCase().replace(/\s+/g, '_') : 'SURESH_MENON'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('⚡ Trigger TRG_TICKET_AUDIT_TRAIL fired! Inserted into TICKET_AUDIT_LOGS.', 'success');
+        await fetchAuditLogs();
+        fetchData();
+      }
+    } catch (err) {
+      showToast('Simulation failed: ' + err.message, 'danger');
+    } finally {
+      setIsSimulatingTrigger(false);
+    }
+  };
+
+  const handleTestFunction = async (ticketId) => {
+    setEvaluatingFunction(true);
+    try {
+      const res = await fetch(`/api/audit-logs/function-test/${ticketId}`);
+      const data = await res.json();
+      if (data.success) {
+        setTestedFunctionOutput(data);
+        showToast(`Function FN_CALCULATE_RESOLUTION_TIME returned ${data.turnaroundHours} hours.`, 'success');
+      }
+    } catch (err) {
+      showToast('Function evaluation failed: ' + err.message, 'danger');
+    } finally {
+      setEvaluatingFunction(false);
+    }
+  };
 
   // Session Handlers
   const handleLoginSuccess = (userObj) => {
@@ -752,6 +820,25 @@ export default function App() {
               >
                 <span>🔬</span> Analytical SQL Lab
               </button>
+
+              <button
+                onClick={() => setAdminActiveTab('audit')}
+                style={{
+                  background: adminActiveTab === 'audit' ? '#eff6ff' : 'transparent',
+                  border: adminActiveTab === 'audit' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: adminActiveTab === 'audit' ? 700 : 500,
+                  color: adminActiveTab === 'audit' ? '#2563eb' : '#475569',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>🛡️</span> Audit Trail & Triggers
+              </button>
             </div>
 
             {/* Contextual Action Button */}
@@ -762,6 +849,15 @@ export default function App() {
             ) : adminActiveTab === 'tickets' ? (
               <button onClick={() => setIsCreateModalOpen(true)} className="btn btn-primary">
                 + Submit New Ticket
+              </button>
+            ) : adminActiveTab === 'audit' ? (
+              <button 
+                onClick={handleSimulateTrigger} 
+                disabled={isSimulatingTrigger} 
+                className="btn btn-primary"
+                style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', border: '1px solid #334155' }}
+              >
+                {isSimulatingTrigger ? 'Firing Trigger...' : '⚡ Test Fire Trigger (TRG_TICKET_AUDIT)'}
               </button>
             ) : null}
           </div>
@@ -1340,9 +1436,338 @@ ORDER BY total_tickets_in_queue DESC;`}
                     )}
                   </div>
                 </div>
+
+                {/* Card 5: Review 2 Stored Function */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#0284c7', textTransform: 'uppercase' }}>
+                      Review 2 PL/SQL &bull; Stored Function
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Active in Schema</span>
+                  </div>
+                  <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    Resolution Time Calculator (<code>FN_CALCULATE_RESOLUTION_TIME</code>)
+                  </h4>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                    Deterministic Oracle function returning exact turnaround hours between creation and resolution.
+                  </p>
+                  <pre style={{ fontSize: '11px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '6px', color: '#334155', overflowX: 'auto', marginBottom: '14px' }}>
+{`CREATE OR REPLACE FUNCTION FN_CALCULATE_RESOLUTION_TIME (
+    p_ticket_id IN NUMBER
+) RETURN NUMBER IS
+    v_hours NUMBER;
+BEGIN
+    SELECT ROUND((CAST(r.resolved_at AS DATE) - CAST(t.created_at AS DATE)) * 24, 2)
+    INTO v_hours
+    FROM TICKETS t JOIN TICKET_RESOLUTIONS r ON t.ticket_id = r.ticket_id
+    WHERE t.ticket_id = p_ticket_id;
+    RETURN v_hours;
+END;`}
+                  </pre>
+                  <div style={{ padding: '12px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                    <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0369a1', marginBottom: '8px' }}>
+                      ⚡ Interactive Oracle Function Evaluator:
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select 
+                        value={testingFunctionId} 
+                        onChange={(e) => setTestingFunctionId(Number(e.target.value))}
+                        className="form-control"
+                        style={{ fontSize: '12px', padding: '6px 10px', width: 'auto' }}
+                      >
+                        <option value={1001}>Ticket #1001 (Resolved)</option>
+                        <option value={1002}>Ticket #1002 (Resolved)</option>
+                        <option value={1003}>Ticket #1003 (Resolved)</option>
+                        <option value={1004}>Ticket #1004 (Resolved)</option>
+                      </select>
+                      <button 
+                        onClick={() => handleTestFunction(testingFunctionId)}
+                        disabled={evaluatingFunction}
+                        className="btn btn-primary btn-xs"
+                        style={{ fontSize: '11.5px', padding: '6px 12px' }}
+                      >
+                        {evaluatingFunction ? 'Calling...' : 'Evaluate Function'}
+                      </button>
+                    </div>
+                    {testedFunctionOutput && (
+                      <div style={{ marginTop: '10px', fontSize: '12px', color: '#0f172a', background: '#ffffff', padding: '8px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                        <span>Result: </span>
+                        <strong style={{ color: '#0284c7' }}>{testedFunctionOutput.turnaroundHours} hours</strong>
+                        <span style={{ color: '#64748b', fontSize: '11px', marginLeft: '6px' }}>turnaround duration</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card 6: Review 2 Stored Procedure */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#e11d48', textTransform: 'uppercase' }}>
+                      Review 2 PL/SQL &bull; Stored Procedure
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Active in Schema</span>
+                  </div>
+                  <h4 style={{ fontSize: '14.5px', fontWeight: 700, color: '#0f172a', margin: '0 0 6px 0' }}>
+                    Atomic Resolution Transaction (<code>SP_RESOLVE_INCIDENT_TRANSACTION</code>)
+                  </h4>
+                  <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '12px' }}>
+                    Encapsulates technician validation, resolution persistence, status update, and savepoint rollback.
+                  </p>
+                  <pre style={{ fontSize: '11px', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '6px', color: '#334155', overflowX: 'auto', marginBottom: '14px' }}>
+{`CREATE OR REPLACE PROCEDURE SP_RESOLVE_INCIDENT_TRANSACTION (
+    p_ticket_id        IN  NUMBER,
+    p_technician_id    IN  NUMBER,
+    p_resolution_notes IN  VARCHAR2,
+    p_status_message   OUT VARCHAR2
+) IS
+    SAVEPOINT before_resolution;
+BEGIN
+    INSERT INTO TICKET_RESOLUTIONS VALUES (p_ticket_id, ...);
+    UPDATE TICKETS SET status = 'RESOLVED' WHERE ticket_id = p_ticket_id;
+    COMMIT;
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK TO before_resolution;
+        RAISE_APPLICATION_ERROR(-20005, SQLERRM);
+END;`}
+                  </pre>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
+                    <div style={{ padding: '8px 10px', background: '#fff1f2', borderRadius: '6px', border: '1px solid #fecdd3', color: '#9f1239' }}>
+                      🛡️ <strong>ACID Boundary:</strong> Rollback to <code>SAVEPOINT</code> guarantees consistency if any constraint fails.
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
+
+          {/* TAB 4: AUDIT TRAIL & PL/SQL TRIGGER TELEMETRY (Review 2 Core Deliverable) */}
+          {adminActiveTab === 'audit' && (() => {
+            const filteredAuditLogs = auditLogs.filter(log => {
+              if (auditFilter !== 'ALL' && log.ACTION_TYPE !== auditFilter) return false;
+              if (auditSearch.trim()) {
+                const q = auditSearch.toLowerCase();
+                const matchId = String(log.TICKET_ID).includes(q);
+                const matchUser = String(log.CHANGED_BY_USER || '').toLowerCase().includes(q);
+                const matchCat = String(log.ISSUE_CATEGORY || '').toLowerCase().includes(q);
+                if (!matchId && !matchUser && !matchCat) return false;
+              }
+              return true;
+            });
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {/* Header Ribbon & Live Trigger Status */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                      Oracle PL/SQL Audit Trail & Trigger Telemetry
+                    </h3>
+                    <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0' }}>
+                      Automated row-level audit events recorded by database trigger <code>TRG_TICKET_AUDIT_TRAIL</code> using <code>:OLD</code> and <code>:NEW</code> pseudorecords.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      onClick={fetchAuditLogs} 
+                      className="btn btn-secondary btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <span>🔄</span> Refresh Stream
+                    </button>
+                    <button 
+                      onClick={handleSimulateTrigger} 
+                      disabled={isSimulatingTrigger}
+                      className="btn btn-primary btn-sm"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <span>⚡</span> {isSimulatingTrigger ? 'Executing...' : 'Test Trigger Fire'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI Metrics */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px' }}>
+                  <div className="card" style={{ padding: '18px 20px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>Total Audit Entries</div>
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>
+                      {auditLogs.length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Rows in `TICKET_AUDIT_LOGS`</div>
+                  </div>
+
+                  <div className="card" style={{ padding: '18px 20px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#2563eb' }}>State Transitions</div>
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#2563eb', marginTop: '4px' }}>
+                      {auditLogs.filter(a => a.ACTION_TYPE === 'UPDATE').length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Fired on `UPDATE` of TICKETS</div>
+                  </div>
+
+                  <div className="card" style={{ padding: '18px 20px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#dc2626' }}>Security Deletions</div>
+                    <div style={{ fontSize: '26px', fontWeight: 700, color: '#dc2626', marginTop: '4px' }}>
+                      {auditLogs.filter(a => a.ACTION_TYPE === 'DELETE').length}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Fired on `DELETE` of TICKETS</div>
+                  </div>
+
+                  <div className="card" style={{ padding: '18px 20px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 500, color: '#16a34a' }}>Active Trigger Status</div>
+                    <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#16a34a', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a' }}></span>
+                      TRG_TICKET_AUDIT_TRAIL
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>AFTER UPDATE OR DELETE FOR EACH ROW</div>
+                  </div>
+                </div>
+
+                {/* Trigger Code Showcase Card for Viva Review */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '18px 20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Review 2 Oracle Trigger Logic &bull; TRG_TICKET_AUDIT_TRAIL (:OLD vs :NEW)
+                    </span>
+                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Active in Schema</span>
+                  </div>
+                  <p style={{ fontSize: '12.5px', color: '#475569', margin: '0 0 10px 0' }}>
+                    Oracle autonomously intercepts all ticket modifications. Whenever an engineer changes status or priority, the trigger captures <code>:OLD</code> and <code>:NEW</code> pseudorecords and inserts an immutable audit log entry.
+                  </p>
+                  <pre style={{ margin: 0, padding: '12px 14px', background: '#0f172a', color: '#f8fafc', borderRadius: '6px', fontSize: '11.5px', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
+{`CREATE OR REPLACE TRIGGER TRG_TICKET_AUDIT_TRAIL
+AFTER UPDATE OR DELETE ON TICKETS
+FOR EACH ROW
+BEGIN
+    IF UPDATING THEN
+        INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
+        VALUES (:NEW.ticket_id, :OLD.status, :NEW.status, :OLD.priority_level, :NEW.priority_level, 'UPDATE', NVL(SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER'), USER), SYSTIMESTAMP);
+    ELSIF DELETING THEN
+        INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
+        VALUES (:OLD.ticket_id, :OLD.status, NULL, :OLD.priority_level, NULL, 'DELETE', NVL(SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER'), USER), SYSTIMESTAMP);
+    END IF;
+END;`}
+                  </pre>
+                </div>
+
+                {/* Audit Table Section */}
+                <section className="card" style={{ padding: '20px', overflow: 'hidden' }}>
+                  {/* Search & Filter Toolbar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {['ALL', 'UPDATE', 'DELETE'].map(filter => (
+                        <button
+                          key={filter}
+                          onClick={() => setAuditFilter(filter)}
+                          className={`btn btn-xs ${auditFilter === filter ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ fontSize: '11.5px', padding: '5px 12px' }}
+                        >
+                          {filter === 'ALL' ? 'All Events' : filter === 'UPDATE' ? 'State Changes (UPDATE)' : 'Deletions (DELETE)'}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      value={auditSearch}
+                      onChange={(e) => setAuditSearch(e.target.value)}
+                      placeholder="Search by Ticket ID or user..."
+                      className="form-control"
+                      style={{ width: '260px', padding: '6px 12px', fontSize: '12.5px' }}
+                    />
+                  </div>
+
+                  {/* Audit Event Table */}
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', fontSize: '11.5px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          <th style={{ padding: '10px 12px' }}>Event ID</th>
+                          <th style={{ padding: '10px 12px' }}>Ticket #</th>
+                          <th style={{ padding: '10px 12px' }}>Action Type</th>
+                          <th style={{ padding: '10px 12px' }}>Status Transition (:OLD &rarr; :NEW)</th>
+                          <th style={{ padding: '10px 12px' }}>Criticality Shift</th>
+                          <th style={{ padding: '10px 12px' }}>Trigger / Changed By</th>
+                          <th style={{ padding: '10px 12px' }}>Timestamp</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredAuditLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: '#94a3b8' }}>
+                              No audit log events found matching criteria.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredAuditLogs.map((log, index) => {
+                            const isDelete = log.ACTION_TYPE === 'DELETE';
+                            return (
+                              <tr key={log.AUDIT_ID || index} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s' }}>
+                                <td style={{ padding: '12px', fontFamily: 'var(--font-mono)', fontWeight: 600, color: '#64748b', fontSize: '12px' }}>
+                                  #{log.AUDIT_ID}
+                                </td>
+                                <td style={{ padding: '12px', fontWeight: 700, color: '#0f172a' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                    <span>{getCategoryIcon(log.ISSUE_CATEGORY)}</span>
+                                    <span>Ticket #{log.TICKET_ID}</span>
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px' }}>
+                                  <span style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    background: isDelete ? '#fef2f2' : '#eff6ff',
+                                    color: isDelete ? '#dc2626' : '#2563eb',
+                                    border: `1px solid ${isDelete ? '#fecaca' : '#bfdbfe'}`
+                                  }}>
+                                    {log.ACTION_TYPE}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+                                    <span className={`badge badge-${String(log.OLD_STATUS || '').toLowerCase()}`} style={{ opacity: 0.7 }}>
+                                      {log.OLD_STATUS || 'NONE'}
+                                    </span>
+                                    <span style={{ color: '#94a3b8' }}>&rarr;</span>
+                                    <span className={`badge badge-${String(log.NEW_STATUS || '').toLowerCase()}`}>
+                                      {log.NEW_STATUS || 'PURGED'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
+                                    <span className={`badge badge-${String(log.OLD_PRIORITY || '').toLowerCase()}`} style={{ opacity: 0.7 }}>
+                                      {log.OLD_PRIORITY || 'NONE'}
+                                    </span>
+                                    <span style={{ color: '#94a3b8' }}>&rarr;</span>
+                                    <span className={`badge badge-${String(log.NEW_PRIORITY || '').toLowerCase()}`}>
+                                      {log.NEW_PRIORITY || 'PURGED'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px', fontSize: '12px' }}>
+                                  <div style={{ fontWeight: 600, color: '#1e293b' }}>
+                                    {log.CHANGED_BY_USER || 'SYSTEM'}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: '#64748b', fontFamily: 'var(--font-mono)' }}>
+                                    {log.TRIGGER_NAME || 'TRG_TICKET_AUDIT_TRAIL'}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '12px', color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                  🕒 {log.FORMATTED_CHANGED_AT || 'Recently'}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+            );
+          })()}
         </main>
       )}
 

@@ -7,6 +7,7 @@ const ticketRoutes = require('./routes/tickets');
 const departmentRoutes = require('./routes/departments');
 const employeeRoutes = require('./routes/employees');
 const authRoutes = require('./routes/auth');
+const auditRoutes = require('./routes/audit');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,8 +34,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/employees', employeeRoutes);
 
-// Arnav's Module: Ticket Management
+// Ticket Management & Review 2 Audit Telemetry
 app.use('/api/tickets', ticketRoutes);
+app.use('/api/audit-logs', auditRoutes);
 
 
 // ============================================================================

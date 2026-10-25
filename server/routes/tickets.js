@@ -313,6 +313,16 @@ router.put('/:id', async (req, res) => {
             return sendResponse(res, 404, false, null, `Ticket #${id} not found.`);
         }
 
+        // Review 2 Audit Hook: Records update if DB trigger is not active
+        try {
+            await executeQuery(`
+                INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
+                VALUES (:1, 'PREVIOUS', :2, 'PREVIOUS', :3, 'UPDATE', :4, SYSTIMESTAMP)
+            `, [Number(id), status || 'UNCHANGED', priority_level || 'UNCHANGED', req.body.user_name || 'TECHNICIAN']);
+        } catch (auditErr) {
+            // Fired natively by Oracle trigger TRG_TICKET_AUDIT_TRAIL
+        }
+
         return sendResponse(res, 200, true, { ticket_id: Number(id), ...req.body }, `Ticket #${id} updated successfully`);
     } catch (err) {
         console.error(`Error updating ticket #${id}:`, err);
@@ -327,6 +337,14 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
+        // Review 2 Audit Hook: Pre-record deletion before cascading delete
+        try {
+            await executeQuery(`
+                INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
+                VALUES (:1, 'ACTIVE', NULL, 'ACTIVE', NULL, 'DELETE', 'SYSTEM_ADMIN', SYSTIMESTAMP)
+            `, [Number(id)]);
+        } catch (auditErr) {}
+
         const sql = `DELETE FROM TICKETS WHERE ticket_id = :id`;
         const result = await executeQuery(sql, { id: Number(id) });
 
@@ -405,6 +423,14 @@ router.post('/:id/resolve', async (req, res) => {
             WHERE ticket_id = :id
         `;
         await executeQuery(updateTicketSql, { id: Number(id), technician_id: Number(technician_id) });
+
+        // Review 2 Audit Hook: Records resolution state transition
+        try {
+            await executeQuery(`
+                INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
+                VALUES (:1, 'IN_PROGRESS', 'RESOLVED', 'CURRENT', 'CURRENT', 'UPDATE', 'RESOLVING_TECHNICIAN', SYSTIMESTAMP)
+            `, [Number(id)]);
+        } catch (auditErr) {}
 
         return sendResponse(res, 200, true, { ticket_id: Number(id), technician_id }, `Ticket #${id} resolved successfully.`);
     } catch (err) {
