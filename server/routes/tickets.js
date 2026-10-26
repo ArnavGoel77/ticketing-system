@@ -120,7 +120,7 @@ router.get('/', async (req, res) => {
                 t.issue_description,
                 t.priority_level,
                 t.status,
-                TO_CHAR(t.created_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_created_at,
+                TO_CHAR(CAST(t.created_at AS TIMESTAMP WITH TIME ZONE) AT TIME ZONE 'Asia/Kolkata', 'DD-Mon-YYYY HH12:MI:SS AM') || ' IST' AS formatted_created_at,
                 TO_CHAR(t.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at_iso,
                 t.assigned_to,
                 assignee.full_name AS assigned_engineer_name,
@@ -129,7 +129,7 @@ router.get('/', async (req, res) => {
                 assignee_dept.location_building AS assigned_engineer_location,
                 r.resolution_id,
                 NVL(r.resolution_notes, 'Pending Assignment / Active Triage') AS resolution_notes,
-                TO_CHAR(r.resolved_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_resolved_at,
+                TO_CHAR(CAST(r.resolved_at AS TIMESTAMP WITH TIME ZONE) AT TIME ZONE 'Asia/Kolkata', 'DD-Mon-YYYY HH12:MI:SS AM') || ' IST' AS formatted_resolved_at,
                 tech.full_name AS technician_name
             FROM TICKETS t
             LEFT OUTER JOIN EMPLOYEES e ON t.user_id = e.employee_id
@@ -165,7 +165,7 @@ router.get('/:id', async (req, res) => {
                 t.issue_description,
                 t.priority_level,
                 t.status,
-                TO_CHAR(t.created_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_created_at,
+                TO_CHAR(CAST(t.created_at AS TIMESTAMP WITH TIME ZONE) AT TIME ZONE 'Asia/Kolkata', 'DD-Mon-YYYY HH12:MI:SS AM') || ' IST' AS formatted_created_at,
                 t.assigned_to,
                 assignee.full_name AS assigned_engineer_name,
                 assignee.email AS assigned_engineer_email,
@@ -173,7 +173,7 @@ router.get('/:id', async (req, res) => {
                 assignee_dept.location_building AS assigned_engineer_location,
                 r.resolution_id,
                 r.resolution_notes,
-                TO_CHAR(r.resolved_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_resolved_at,
+                TO_CHAR(CAST(r.resolved_at AS TIMESTAMP WITH TIME ZONE) AT TIME ZONE 'Asia/Kolkata', 'DD-Mon-YYYY HH12:MI:SS AM') || ' IST' AS formatted_resolved_at,
                 tech.full_name AS technician_name
             FROM TICKETS t
             LEFT OUTER JOIN EMPLOYEES e ON t.user_id = e.employee_id
@@ -267,41 +267,63 @@ router.post('/', async (req, res) => {
 // ============================================================================
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { status, priority_level, assigned_to } = req.body;
+    const { status, priority_level, assigned_to, editor_employee_id, editor_role } = req.body;
 
     if (!status && !priority_level && assigned_to === undefined) {
         return sendResponse(res, 400, false, null, 'Provide status, priority_level, or assigned_to to update.');
     }
 
-    const updates = [];
-    const binds = { id: Number(id) };
-
-    if (status) {
-        const validStatuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
-        const normalizedStatus = status.toUpperCase();
-        if (!validStatuses.includes(normalizedStatus)) {
-            return sendResponse(res, 400, false, null, `Invalid status. Must be: ${validStatuses.join(', ')}`);
-        }
-        updates.push(`status = :status`);
-        binds.status = normalizedStatus;
-    }
-
-    if (priority_level) {
-        const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-        const normalizedPriority = priority_level.toUpperCase();
-        if (!validPriorities.includes(normalizedPriority)) {
-            return sendResponse(res, 400, false, null, `Invalid priority. Must be: ${validPriorities.join(', ')}`);
-        }
-        updates.push(`priority_level = :priority_level`);
-        binds.priority_level = normalizedPriority;
-    }
-
-    if (assigned_to !== undefined) {
-        updates.push(`assigned_to = :assigned_to`);
-        binds.assigned_to = assigned_to ? Number(assigned_to) : null;
-    }
-
     try {
+        // Step 0: Check current ticket status and assignee
+        const checkSql = `SELECT status, assigned_to, priority_level FROM TICKETS WHERE ticket_id = :id`;
+        const checkResult = await executeQuery(checkSql, { id: Number(id) });
+        if (!checkResult.rows || checkResult.rows.length === 0) {
+            return sendResponse(res, 404, false, null, `Ticket #${id} not found.`);
+        }
+        const currentTicket = checkResult.rows[0];
+        const currentStatus = (currentTicket.STATUS || '').toUpperCase();
+        const currentAssignedTo = currentTicket.ASSIGNED_TO;
+
+        // Rule 1: Cannot change criticality if ticket is already RESOLVED or CLOSED
+        if (priority_level && (currentStatus === 'RESOLVED' || currentStatus === 'CLOSED')) {
+            return sendResponse(res, 400, false, null, `Criticality locked: Cannot modify the priority of a resolved or closed ticket.`);
+        }
+
+        // Rule 2: Cannot change criticality if ticket is in-progress and assigned to another engineer (unless ADMIN)
+        if (priority_level && currentStatus === 'IN_PROGRESS' && currentAssignedTo) {
+            if (editor_employee_id && Number(currentAssignedTo) !== Number(editor_employee_id) && editor_role !== 'ADMIN') {
+                return sendResponse(res, 403, false, null, `Permission denied: Only the assigned lead engineer (or an administrator) can adjust the criticality of this ticket.`);
+            }
+        }
+
+        const updates = [];
+        const binds = { id: Number(id) };
+
+        if (status) {
+            const validStatuses = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+            const normalizedStatus = status.toUpperCase();
+            if (!validStatuses.includes(normalizedStatus)) {
+                return sendResponse(res, 400, false, null, `Invalid status. Must be: ${validStatuses.join(', ')}`);
+            }
+            updates.push(`status = :status`);
+            binds.status = normalizedStatus;
+        }
+
+        if (priority_level) {
+            const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+            const normalizedPriority = priority_level.toUpperCase();
+            if (!validPriorities.includes(normalizedPriority)) {
+                return sendResponse(res, 400, false, null, `Invalid priority. Must be: ${validPriorities.join(', ')}`);
+            }
+            updates.push(`priority_level = :priority_level`);
+            binds.priority_level = normalizedPriority;
+        }
+
+        if (assigned_to !== undefined) {
+            updates.push(`assigned_to = :assigned_to`);
+            binds.assigned_to = assigned_to ? Number(assigned_to) : null;
+        }
+
         const sql = `
             UPDATE TICKETS 
             SET ${updates.join(', ')}
@@ -311,16 +333,6 @@ router.put('/:id', async (req, res) => {
         const result = await executeQuery(sql, binds);
         if (result.rowsAffected === 0) {
             return sendResponse(res, 404, false, null, `Ticket #${id} not found.`);
-        }
-
-        // Review 2 Audit Hook: Records update if DB trigger is not active
-        try {
-            await executeQuery(`
-                INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
-                VALUES (:1, 'PREVIOUS', :2, 'PREVIOUS', :3, 'UPDATE', :4, SYSTIMESTAMP)
-            `, [Number(id), status || 'UNCHANGED', priority_level || 'UNCHANGED', req.body.user_name || 'TECHNICIAN']);
-        } catch (auditErr) {
-            // Fired natively by Oracle trigger TRG_TICKET_AUDIT_TRAIL
         }
 
         return sendResponse(res, 200, true, { ticket_id: Number(id), ...req.body }, `Ticket #${id} updated successfully`);
@@ -337,14 +349,6 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        // Review 2 Audit Hook: Pre-record deletion before cascading delete
-        try {
-            await executeQuery(`
-                INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
-                VALUES (:1, 'ACTIVE', NULL, 'ACTIVE', NULL, 'DELETE', 'SYSTEM_ADMIN', SYSTIMESTAMP)
-            `, [Number(id)]);
-        } catch (auditErr) {}
-
         const sql = `DELETE FROM TICKETS WHERE ticket_id = :id`;
         const result = await executeQuery(sql, { id: Number(id) });
 
@@ -423,14 +427,6 @@ router.post('/:id/resolve', async (req, res) => {
             WHERE ticket_id = :id
         `;
         await executeQuery(updateTicketSql, { id: Number(id), technician_id: Number(technician_id) });
-
-        // Review 2 Audit Hook: Records resolution state transition
-        try {
-            await executeQuery(`
-                INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
-                VALUES (:1, 'IN_PROGRESS', 'RESOLVED', 'CURRENT', 'CURRENT', 'UPDATE', 'RESOLVING_TECHNICIAN', SYSTIMESTAMP)
-            `, [Number(id)]);
-        } catch (auditErr) {}
 
         return sendResponse(res, 200, true, { ticket_id: Number(id), technician_id }, `Ticket #${id} resolved successfully.`);
     } catch (err) {
