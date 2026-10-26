@@ -54,7 +54,8 @@ rules.md
 *TASKS*.md
 .agents/
 .agents
-
-
-
 *.docx
+
+# Scratch & Report Generator scripts
+scratch/
+*.py
