@@ -101,10 +101,12 @@ router.get('/', async (req, res) => {
                 NVL(a.new_priority, 'N/A') AS new_priority,
                 a.action_type,
                 NVL(a.changed_by_user, 'DATABASE_TRIGGER') AS changed_by_user,
-                TO_CHAR(a.changed_at, 'DD-Mon-YYYY HH24:MI:SS') AS formatted_changed_at,
+                TO_CHAR(CAST(a.changed_at AS TIMESTAMP WITH TIME ZONE) AT TIME ZONE 'Asia/Kolkata', 'DD-Mon-YYYY HH12:MI:SS AM') || ' IST' AS formatted_changed_at,
                 'TRG_TICKET_AUDIT_TRAIL' AS trigger_name
             FROM TICKET_AUDIT_LOGS a
             LEFT JOIN TICKETS t ON a.ticket_id = t.ticket_id
+            WHERE NVL(a.old_status, '') NOT IN ('PREVIOUS')
+              AND NVL(a.old_priority, '') NOT IN ('CURRENT')
             ORDER BY a.audit_id DESC
         `;
 

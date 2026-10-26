@@ -27,6 +27,29 @@ const getCategoryIcon = (category) => {
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 
+const formatISTDisplay = (dateStr) => {
+  if (!dateStr) return '—';
+  if (typeof dateStr === 'string' && dateStr.includes('IST')) {
+    return dateStr;
+  }
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }) + ' IST';
+    }
+  } catch (e) {}
+  return dateStr;
+};
+
 export default function App() {
   // Session Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
@@ -393,12 +416,16 @@ export default function App() {
       const res = await fetch(`/api/tickets/${ticketId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priority_level: newPriority }),
+        body: JSON.stringify({
+          priority_level: newPriority,
+          editor_employee_id: currentUser?.employee_id,
+          editor_role: currentUser?.role
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.message || 'Priority update failed');
 
-      showToast(`Ticket #${ticketId} priority escalated to ${newPriority}`, 'success');
+      showToast(`Ticket #${ticketId} priority updated to ${newPriority}`, 'success');
       fetchData();
     } catch (err) {
       showToast(err.message, 'danger');
@@ -520,24 +547,26 @@ export default function App() {
     }
   };
 
-  // Filtered Tickets (Support search across ID, requester, category, and issue description)
-  const filteredTickets = tickets.filter((t) => {
-    const id = String(t.TICKET_ID || t.ticket_id || '');
-    const reporter = String(t.REPORTER_NAME || t.reporter_name || '').toLowerCase();
-    const cat = String(t.ISSUE_CATEGORY || t.issue_category || '').toUpperCase();
-    const desc = String(t.ISSUE_DESCRIPTION || t.issue_description || '').toLowerCase();
-    const status = String(t.STATUS || t.status || '').toUpperCase();
-    const priority = String(t.PRIORITY_LEVEL || t.priority_level || '').toUpperCase();
+  // Filtered Tickets (Support search across ID, requester, category, and issue description - Latest on Top)
+  const filteredTickets = tickets
+    .filter((t) => {
+      const id = String(t.TICKET_ID || t.ticket_id || '');
+      const reporter = String(t.REPORTER_NAME || t.reporter_name || '').toLowerCase();
+      const cat = String(t.ISSUE_CATEGORY || t.issue_category || '').toUpperCase();
+      const desc = String(t.ISSUE_DESCRIPTION || t.issue_description || '').toLowerCase();
+      const status = String(t.STATUS || t.status || '').toUpperCase();
+      const priority = String(t.PRIORITY_LEVEL || t.priority_level || '').toUpperCase();
 
-    const query = search.toLowerCase();
-    const matchesSearch =
-      !search || id.includes(query) || reporter.includes(query) || cat.toLowerCase().includes(query) || desc.includes(query);
-    const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
-    const matchesPriority = priorityFilter === 'ALL' || priority === priorityFilter;
-    const matchesCategory = categoryFilter === 'ALL' || cat === categoryFilter;
+      const query = search.toLowerCase();
+      const matchesSearch =
+        !search || id.includes(query) || reporter.includes(query) || cat.toLowerCase().includes(query) || desc.includes(query);
+      const matchesStatus = statusFilter === 'ALL' || status === statusFilter;
+      const matchesPriority = priorityFilter === 'ALL' || priority === priorityFilter;
+      const matchesCategory = categoryFilter === 'ALL' || cat === categoryFilter;
 
-    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
-  });
+      return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
+    })
+    .sort((a, b) => Number(b.TICKET_ID || b.ticket_id || 0) - Number(a.TICKET_ID || a.ticket_id || 0));
 
   // Filtered Employees
   const filteredEmployees = employees.filter((emp) => {
@@ -1263,7 +1292,7 @@ export default function App() {
                               </span>
                             </td>
                             <td style={{ padding: '12px', color: '#64748b', fontSize: '12px' }}>
-                              {date}
+                              {formatISTDisplay(date)}
                             </td>
                             <td style={{ padding: '12px', textAlign: 'right' }}>
                               <button
@@ -1543,17 +1572,19 @@ END;`}
 
           {/* TAB 4: AUDIT TRAIL & PL/SQL TRIGGER TELEMETRY (Review 2 Core Deliverable) */}
           {adminActiveTab === 'audit' && (() => {
-            const filteredAuditLogs = auditLogs.filter(log => {
-              if (auditFilter !== 'ALL' && log.ACTION_TYPE !== auditFilter) return false;
-              if (auditSearch.trim()) {
-                const q = auditSearch.toLowerCase();
-                const matchId = String(log.TICKET_ID).includes(q);
-                const matchUser = String(log.CHANGED_BY_USER || '').toLowerCase().includes(q);
-                const matchCat = String(log.ISSUE_CATEGORY || '').toLowerCase().includes(q);
-                if (!matchId && !matchUser && !matchCat) return false;
-              }
-              return true;
-            });
+            const filteredAuditLogs = auditLogs
+              .filter(log => {
+                if (auditFilter !== 'ALL' && log.ACTION_TYPE !== auditFilter) return false;
+                if (auditSearch.trim()) {
+                  const q = auditSearch.toLowerCase();
+                  const matchId = String(log.TICKET_ID).includes(q);
+                  const matchUser = String(log.CHANGED_BY_USER || '').toLowerCase().includes(q);
+                  const matchCat = String(log.ISSUE_CATEGORY || '').toLowerCase().includes(q);
+                  if (!matchId && !matchUser && !matchCat) return false;
+                }
+                return true;
+              })
+              .sort((a, b) => Number(b.AUDIT_ID || b.audit_id || 0) - Number(a.AUDIT_ID || a.audit_id || 0));
 
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -1620,33 +1651,6 @@ END;`}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>AFTER UPDATE OR DELETE FOR EACH ROW</div>
                   </div>
-                </div>
-
-                {/* Trigger Code Showcase Card for Viva Review */}
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '18px 20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Review 2 Oracle Trigger Logic &bull; TRG_TICKET_AUDIT_TRAIL (:OLD vs :NEW)
-                    </span>
-                    <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Active in Schema</span>
-                  </div>
-                  <p style={{ fontSize: '12.5px', color: '#475569', margin: '0 0 10px 0' }}>
-                    Oracle autonomously intercepts all ticket modifications. Whenever an engineer changes status or priority, the trigger captures <code>:OLD</code> and <code>:NEW</code> pseudorecords and inserts an immutable audit log entry.
-                  </p>
-                  <pre style={{ margin: 0, padding: '12px 14px', background: '#0f172a', color: '#f8fafc', borderRadius: '6px', fontSize: '11.5px', overflowX: 'auto', fontFamily: 'var(--font-mono)' }}>
-{`CREATE OR REPLACE TRIGGER TRG_TICKET_AUDIT_TRAIL
-AFTER UPDATE OR DELETE ON TICKETS
-FOR EACH ROW
-BEGIN
-    IF UPDATING THEN
-        INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
-        VALUES (:NEW.ticket_id, :OLD.status, :NEW.status, :OLD.priority_level, :NEW.priority_level, 'UPDATE', NVL(SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER'), USER), SYSTIMESTAMP);
-    ELSIF DELETING THEN
-        INSERT INTO TICKET_AUDIT_LOGS (ticket_id, old_status, new_status, old_priority, new_priority, action_type, changed_by_user, changed_at)
-        VALUES (:OLD.ticket_id, :OLD.status, NULL, :OLD.priority_level, NULL, 'DELETE', NVL(SYS_CONTEXT('USERENV', 'CLIENT_IDENTIFIER'), USER), SYSTIMESTAMP);
-    END IF;
-END;`}
-                  </pre>
                 </div>
 
                 {/* Audit Table Section */}
@@ -1755,7 +1759,7 @@ END;`}
                                   </div>
                                 </td>
                                 <td style={{ padding: '12px', color: '#64748b', fontSize: '12px', whiteSpace: 'nowrap' }}>
-                                  🕒 {log.FORMATTED_CHANGED_AT || 'Recently'}
+                                  🕒 {formatISTDisplay(log.FORMATTED_CHANGED_AT || log.CHANGED_AT || 'Recently')}
                                 </td>
                               </tr>
                             );
@@ -1779,21 +1783,23 @@ END;`}
         const myActiveCount = myTickets.filter(t => (t.STATUS || t.status) !== 'RESOLVED').length;
         const myResolvedCount = myTickets.filter(t => (t.STATUS || t.status) === 'RESOLVED').length;
 
-        const filteredMyTickets = myTickets.filter(t => {
-          const status = (t.STATUS || t.status || '').toUpperCase();
-          const cat = (t.ISSUE_CATEGORY || t.issue_category || '').toLowerCase();
-          const desc = (t.ISSUE_DESCRIPTION || t.issue_description || '').toLowerCase();
-          const id = String(t.TICKET_ID || t.ticket_id || '');
-          const eng = (t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name || '').toLowerCase();
-          const query = userSearchTerm.toLowerCase();
+        const filteredMyTickets = myTickets
+          .filter(t => {
+            const status = (t.STATUS || t.status || '').toUpperCase();
+            const cat = (t.ISSUE_CATEGORY || t.issue_category || '').toLowerCase();
+            const desc = (t.ISSUE_DESCRIPTION || t.issue_description || '').toLowerCase();
+            const id = String(t.TICKET_ID || t.ticket_id || '');
+            const eng = (t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name || '').toLowerCase();
+            const query = userSearchTerm.toLowerCase();
 
-          const matchesSearch = !userSearchTerm || id.includes(query) || cat.includes(query) || desc.includes(query) || eng.includes(query);
-          if (!matchesSearch) return false;
+            const matchesSearch = !userSearchTerm || id.includes(query) || cat.includes(query) || desc.includes(query) || eng.includes(query);
+            if (!matchesSearch) return false;
 
-          if (userStatusFilter === 'ACTIVE') return status !== 'RESOLVED';
-          if (userStatusFilter === 'RESOLVED') return status === 'RESOLVED';
-          return true;
-        });
+            if (userStatusFilter === 'ACTIVE') return status !== 'RESOLVED';
+            if (userStatusFilter === 'RESOLVED') return status === 'RESOLVED';
+            return true;
+          })
+          .sort((a, b) => Number(b.TICKET_ID || b.ticket_id || 0) - Number(a.TICKET_ID || a.ticket_id || 0));
 
         return (
           <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
@@ -2005,7 +2011,7 @@ END;`}
                             {priority}
                           </span>
                           <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                            • Reported on {date}
+                            • Reported on {formatISTDisplay(date)}
                           </span>
                         </div>
 
@@ -2132,7 +2138,7 @@ END;`}
                             </span>
                             {resolvedAt && (
                               <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                                Resolved on {resolvedAt}
+                                Resolved on {formatISTDisplay(resolvedAt)}
                               </span>
                             )}
                           </div>
@@ -2372,6 +2378,9 @@ END;`}
                           const assignedTo = t.ASSIGNED_TO || t.assigned_to;
                           const isAssignedToMe = assignedTo && Number(assignedTo) === Number(currentUser.employee_id);
                           const canResolve = isAssignedToMe || currentUser.role === 'ADMIN';
+                          const isResolved = status === 'RESOLVED' || status === 'CLOSED';
+                          const isAssignedToOther = assignedTo && Number(assignedTo) !== Number(currentUser.employee_id);
+                          const canEditPriority = !isResolved && (!isAssignedToOther || currentUser.role === 'ADMIN');
 
                           return (
                             <tr key={ticketId} className="table-hover-row" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -2404,31 +2413,55 @@ END;`}
                                 </div>
                               </td>
                               <td style={{ padding: '12px 14px' }}>
-                                <select
-                                  value={priority}
-                                  onChange={(e) => handleUpdatePriority(ticketId, e.target.value)}
-                                  style={{
-                                    width: '100px',
-                                    padding: '4px 8px',
-                                    fontSize: '11px',
-                                    fontWeight: 700,
-                                    borderRadius: '6px',
-                                    border: '1px solid #cbd5e1',
-                                    background:
-                                      priority === 'CRITICAL' ? '#fef2f2' :
-                                      priority === 'HIGH' ? '#fff7ed' :
-                                      priority === 'MEDIUM' ? '#eff6ff' : '#f8fafc',
-                                    color:
-                                      priority === 'CRITICAL' ? '#b91c1c' :
-                                      priority === 'HIGH' ? '#c2410c' :
-                                      priority === 'MEDIUM' ? '#2563eb' : '#475569',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  {PRIORITIES.map((p) => (
-                                    <option key={p} value={p}>{p}</option>
-                                  ))}
-                                </select>
+                                {!canEditPriority ? (
+                                  <span
+                                    className={`badge badge-${String(priority).toLowerCase()}`}
+                                    title={
+                                      isResolved
+                                        ? "Criticality locked: Incident has been resolved"
+                                        : `Criticality locked: Under investigation by ${engineerName || 'another engineer'}`
+                                    }
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '4px 8px',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      borderRadius: '6px',
+                                      cursor: 'not-allowed',
+                                      opacity: 0.85
+                                    }}
+                                  >
+                                    🔒 {priority}
+                                  </span>
+                                ) : (
+                                  <select
+                                    value={priority}
+                                    onChange={(e) => handleUpdatePriority(ticketId, e.target.value)}
+                                    style={{
+                                      width: '100px',
+                                      padding: '4px 8px',
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      borderRadius: '6px',
+                                      border: '1px solid #cbd5e1',
+                                      background:
+                                        priority === 'CRITICAL' ? '#fef2f2' :
+                                        priority === 'HIGH' ? '#fff7ed' :
+                                        priority === 'MEDIUM' ? '#eff6ff' : '#f8fafc',
+                                      color:
+                                        priority === 'CRITICAL' ? '#b91c1c' :
+                                        priority === 'HIGH' ? '#c2410c' :
+                                        priority === 'MEDIUM' ? '#2563eb' : '#475569',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {PRIORITIES.map((p) => (
+                                      <option key={p} value={p}>{p}</option>
+                                    ))}
+                                  </select>
+                                )}
                               </td>
                               <td style={{ padding: '12px 14px', fontSize: '12px' }}>
                                 {engineerName ? (
@@ -2805,7 +2838,7 @@ END;`}
 
                 <div style={{ fontSize: '12px', color: '#64748b', textAlign: 'right' }}>
                   <div>Reported on:</div>
-                  <strong style={{ color: '#334155' }}>{date}</strong>
+                  <strong style={{ color: '#334155' }}>{formatISTDisplay(date)}</strong>
                 </div>
               </div>
 
