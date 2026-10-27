@@ -84,4 +84,4 @@ GROUP BY t.issue_category, t.priority_level;
 -- SELECT ticket_id, FN_CALCULATE_RESOLUTION_TIME(ticket_id) AS hours_taken FROM TICKETS WHERE status = 'RESOLVED';
 
 -- Test 3: Test Lifecycle Summary View:
--- SELECT ticket_id, requester_name, assigned_engineer_name, status, turnaround_hours FROM V_INCIDENT_LIFECYCLE_SUMMARY;
+-- SELECT ticket_id, requester_name, assigned_engineer_name, status, turnaround_hours FROM V_INCIDENT_LIFECYCLE_SUMMARY ORDER BY ticket_id DESC;

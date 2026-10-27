@@ -18,7 +18,7 @@ SELECT
     NVL(TO_CHAR(r.resolved_at, 'DD-Mon-YYYY HH24:MI'), 'Unresolved') AS formatted_resolved_date
 FROM TICKETS t
 LEFT OUTER JOIN TICKET_RESOLUTIONS r ON t.ticket_id = r.ticket_id
-ORDER BY t.ticket_id;
+ORDER BY t.created_at DESC, t.ticket_id DESC;
 
 -- Calculate turnaround time in hours using ROUND and date subtraction
 SELECT 
