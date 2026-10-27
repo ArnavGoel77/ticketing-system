@@ -137,7 +137,7 @@ router.get('/', async (req, res) => {
             LEFT OUTER JOIN DEPARTMENTS assignee_dept ON assignee.department_id = assignee_dept.department_id
             LEFT OUTER JOIN TICKET_RESOLUTIONS r ON t.ticket_id = r.ticket_id
             LEFT OUTER JOIN EMPLOYEES tech ON r.technician_id = tech.employee_id
-            ORDER BY t.ticket_id DESC
+            ORDER BY t.created_at DESC, t.ticket_id DESC
         `;
 
         const result = await executeQuery(sql);
@@ -225,8 +225,8 @@ router.post('/', async (req, res) => {
         const sql = `
             INSERT INTO TICKETS (user_id, issue_category, issue_description, priority_level, status)
             VALUES (:user_id, :issue_category, :issue_description, :priority_level, 'OPEN')
-            RETURNING ticket_id, user_id, issue_category, issue_description, priority_level, status, TO_CHAR(created_at, 'DD-Mon-YYYY HH24:MI:SS')
-            INTO :out_id, :out_user, :out_category, :out_desc, :out_priority, :out_status, :out_created
+            RETURNING ticket_id, user_id, issue_category, issue_description, priority_level, status, TO_CHAR(CAST(created_at AS TIMESTAMP WITH TIME ZONE) AT TIME ZONE 'Asia/Kolkata', 'DD-Mon-YYYY HH12:MI:SS AM') || ' IST', TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS')
+            INTO :out_id, :out_user, :out_category, :out_desc, :out_priority, :out_status, :out_created, :out_created_iso
         `;
 
         const binds = {
@@ -240,7 +240,8 @@ router.post('/', async (req, res) => {
             out_desc: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 1000 },
             out_priority: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 20 },
             out_status: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 20 },
-            out_created: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 50 }
+            out_created: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 60 },
+            out_created_iso: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 50 }
         };
 
         const result = await executeQuery(sql, binds);
@@ -251,7 +252,8 @@ router.post('/', async (req, res) => {
             issue_description: result.outBinds.out_desc[0],
             priority_level: result.outBinds.out_priority[0],
             status: result.outBinds.out_status[0],
-            formatted_created_at: result.outBinds.out_created[0]
+            formatted_created_at: result.outBinds.out_created[0],
+            created_at_iso: result.outBinds.out_created_iso[0]
         };
 
         return sendResponse(res, 201, true, createdTicket, `Ticket #${createdTicket.ticket_id} created successfully`);

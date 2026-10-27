@@ -50,6 +50,69 @@ const formatISTDisplay = (dateStr) => {
   return dateStr;
 };
 
+const formatISTParts = (dateStr) => {
+  if (!dateStr) return { date: '—', time: '' };
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const dStr = d.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      }).replace(/\s+/g, '-');
+      const tStr = d.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }) + ' IST';
+      return { date: dStr, time: tStr };
+    }
+  } catch (e) {}
+
+  if (typeof dateStr === 'string') {
+    const match = dateStr.match(/^(\d{1,2}-[A-Za-z]{3}-\d{4})\s+(.+)$/);
+    if (match) {
+      return { date: match[1], time: match[2] };
+    }
+  }
+  return { date: String(dateStr), time: '' };
+};
+
+const parseTicketTimestamp = (ticket) => {
+  if (!ticket) return 0;
+  // 1. ISO string (most accurate across all browsers)
+  const iso = ticket.CREATED_AT_ISO || ticket.created_at_iso;
+  if (iso) {
+    const t = Date.parse(iso);
+    if (!isNaN(t)) return t;
+  }
+  // 2. Raw timestamp string or Date object
+  const raw = ticket.CREATED_AT || ticket.created_at;
+  if (raw) {
+    const t = Date.parse(raw);
+    if (!isNaN(t)) return t;
+  }
+  // 3. Formatted display string (strip trailing ' IST' for cross-browser parsing)
+  const formatted = ticket.FORMATTED_CREATED_AT || ticket.formatted_created_at;
+  if (formatted) {
+    const cleaned = String(formatted).replace(/\s+IST$/i, '').trim();
+    const t = Date.parse(cleaned);
+    if (!isNaN(t)) return t;
+  }
+  return 0;
+};
+
+const sortTicketsByLatest = (a, b) => {
+  const timeA = parseTicketTimestamp(a);
+  const timeB = parseTicketTimestamp(b);
+  if (timeA > 0 && timeB > 0 && timeA !== timeB) {
+    return timeB - timeA; // Latest created first
+  }
+  return Number(b.TICKET_ID || b.ticket_id || 0) - Number(a.TICKET_ID || a.ticket_id || 0);
+};
+
 export default function App() {
   // Session Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
@@ -220,7 +283,7 @@ export default function App() {
         auditRes.json()
       ]);
 
-      if (ticketsJson.success) setTickets(ticketsJson.data || []);
+      if (ticketsJson.success) setTickets((ticketsJson.data || []).sort(sortTicketsByLatest));
       if (metricsJson.success) setMetrics(metricsJson.data || null);
       if (deptJson.success) setDepartments(deptJson.data || []);
       if (empJson.success) setEmployees(empJson.data || []);
@@ -566,7 +629,7 @@ export default function App() {
 
       return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
     })
-    .sort((a, b) => Number(b.TICKET_ID || b.ticket_id || 0) - Number(a.TICKET_ID || a.ticket_id || 0));
+    .sort(sortTicketsByLatest);
 
   // Filtered Employees
   const filteredEmployees = employees.filter((emp) => {
@@ -607,7 +670,7 @@ export default function App() {
   const activePill = rolePillMap[currentUser.role] || rolePillMap.USER;
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-app)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app)', display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       {/* Toast Notification */}
       {notification && (
         <div
@@ -647,6 +710,8 @@ export default function App() {
           position: 'sticky',
           top: 0,
           zIndex: 40,
+          width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         {/* Left: Brand & Portal Title */}
@@ -780,7 +845,7 @@ export default function App() {
       {/* VIEW 1: DEDICATED /admin VIEW (Admin Console)                         */}
       {/* ===================================================================== */}
       {currentRoute === '/admin' && (
-        <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+        <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', boxSizing: 'border-box', overflowX: 'hidden', flex: 1 }}>
           {/* Admin Navigation Ribbon */}
           <div
             style={{
@@ -1799,10 +1864,10 @@ END;`}
             if (userStatusFilter === 'RESOLVED') return status === 'RESOLVED';
             return true;
           })
-          .sort((a, b) => Number(b.TICKET_ID || b.ticket_id || 0) - Number(a.TICKET_ID || a.ticket_id || 0));
+          .sort(sortTicketsByLatest);
 
         return (
-          <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+          <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 28px', width: '100%', boxSizing: 'border-box', overflowX: 'hidden', flex: 1 }}>
             {/* Page Header */}
             <div
               style={{
@@ -2163,7 +2228,7 @@ END;`}
         const engineerResolvedCount = tickets.filter(t => (t.STATUS || t.status) === 'RESOLVED').length;
 
         return (
-          <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', flex: 1 }}>
+          <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 28px', width: '100%', boxSizing: 'border-box', overflowX: 'hidden', flex: 1 }}>
             {/* Support Workbench Header */}
             <div
               style={{
@@ -2235,9 +2300,9 @@ END;`}
             </div>
 
             {/* Workbench Grid: Left Category Sidebar + Right Incident Queue */}
-            <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '22px', alignItems: 'start' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '240px minmax(0, 1fr)', gap: '20px', alignItems: 'start', width: '100%' }}>
               {/* Category Filter Sidebar */}
-              <aside style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <aside style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '240px', minWidth: '240px' }}>
                 <div className="card" style={{ padding: '16px', borderRadius: '10px' }}>
                   <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px' }}>
                     Incident Categories
@@ -2303,7 +2368,7 @@ END;`}
               </aside>
 
               {/* Engineer Triage Queue */}
-              <section className="card" style={{ padding: '20px', borderRadius: '10px' }}>
+              <section className="card" style={{ padding: '20px', borderRadius: '10px', minWidth: 0, width: '100%', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                   <div style={{ position: 'relative', width: '280px' }}>
                     <input
@@ -2345,24 +2410,25 @@ END;`}
                 </div>
 
                 {/* Workbench Ticket List */}
-                <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', width: '100%', maxWidth: '100%' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', background: '#f8fafc' }}>
-                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>ID</th>
-                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Requester</th>
-                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Category</th>
-                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Problem Description</th>
-                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Criticality</th>
-                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Lead Engineer</th>
-                        <th style={{ padding: '12px 14px', fontWeight: 600 }}>Status</th>
-                        <th style={{ padding: '12px 14px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>ID</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>Requester</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>Category</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>Problem Description</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>Criticality</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>Lead Engineer</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>Status</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600 }}>Reported</th>
+                        <th style={{ padding: '10px 10px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredTickets.length === 0 ? (
                         <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: '36px 16px', color: '#94a3b8' }}>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '36px 16px', color: '#94a3b8' }}>
                             No incidents found matching current filters.
                           </td>
                         </tr>
@@ -2373,6 +2439,8 @@ END;`}
                           const cat = t.ISSUE_CATEGORY || t.issue_category;
                           const priority = t.PRIORITY_LEVEL || t.priority_level;
                           const status = t.STATUS || t.status;
+                          const date = t.FORMATTED_CREATED_AT || t.formatted_created_at || t.CREATED_AT || t.created_at;
+                          const dateParts = formatISTParts(date);
                           const desc = t.ISSUE_DESCRIPTION || t.issue_description || '—';
                           const engineerName = t.ASSIGNED_ENGINEER_NAME || t.assigned_engineer_name;
                           const assignedTo = t.ASSIGNED_TO || t.assigned_to;
@@ -2384,19 +2452,19 @@ END;`}
 
                           return (
                             <tr key={ticketId} className="table-hover-row" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                              <td style={{ padding: '12px 14px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#2563eb', fontSize: '12.5px' }}>
+                              <td style={{ padding: '10px 10px', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#2563eb', fontSize: '12.5px' }}>
                                 #{ticketId}
                               </td>
-                              <td style={{ padding: '12px 14px' }}>
+                              <td style={{ padding: '10px 10px' }}>
                                 <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '13px' }}>{reporter}</div>
                               </td>
-                              <td style={{ padding: '12px 14px' }}>
+                              <td style={{ padding: '10px 10px' }}>
                                 <span className="category-badge">
                                   <span>{getCategoryIcon(cat)}</span>
                                   <span>{cat}</span>
                                 </span>
                               </td>
-                              <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
+                              <td style={{ padding: '10px 10px', maxWidth: '170px' }}>
                                 <div
                                   onClick={() => openInvestigationModal(t)}
                                   title="Click to view complete problem description"
@@ -2412,7 +2480,7 @@ END;`}
                                   {desc}
                                 </div>
                               </td>
-                              <td style={{ padding: '12px 14px' }}>
+                              <td style={{ padding: '10px 10px' }}>
                                 {!canEditPriority ? (
                                   <span
                                     className={`badge badge-${String(priority).toLowerCase()}`}
@@ -2463,7 +2531,7 @@ END;`}
                                   </select>
                                 )}
                               </td>
-                              <td style={{ padding: '12px 14px', fontSize: '12px' }}>
+                              <td style={{ padding: '10px 10px', fontSize: '12px' }}>
                                 {engineerName ? (
                                   <span style={{ fontWeight: 600, color: '#0f172a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                     👨‍💻 {engineerName}
@@ -2472,7 +2540,7 @@ END;`}
                                   <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Unassigned</span>
                                 )}
                               </td>
-                              <td style={{ padding: '12px 14px' }}>
+                              <td style={{ padding: '10px 10px' }}>
                                 <span className={`badge status-${String(status).toLowerCase()}`}>
                                   <span
                                     className={`status-dot ${
@@ -2486,7 +2554,11 @@ END;`}
                                   {String(status).replace('_', ' ')}
                                 </span>
                               </td>
-                              <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                              <td style={{ padding: '10px 10px', fontSize: '11.5px', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 600, color: '#334155' }}>{dateParts.date}</div>
+                                {dateParts.time && <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>{dateParts.time}</div>}
+                              </td>
+                              <td style={{ padding: '10px 10px', textAlign: 'right' }}>
                                 <div style={{ display: 'inline-flex', gap: '6px', alignItems: 'center' }}>
                                   {status === 'OPEN' && (
                                     <button
